@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /espace-client
+Disallow: /livreur
+Disallow: /paiement
+Disallow: /facture
+
+Sitemap: https://www.lbgexpresscolis.fr/sitemap.xml
