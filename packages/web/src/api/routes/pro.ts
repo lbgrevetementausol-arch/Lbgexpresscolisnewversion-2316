@@ -8,15 +8,25 @@ import { generateRef } from "../lib/pricing";
 
 const ACCESS_CODE = process.env.PRO_ACCESS_CODE ?? "LBG-PRO-2026";
 
-/** Toutes les procédures pro exigent le code d'accès du module professionnel. */
-const guard = base
-  .input(z.object({ accessCode: z.string().min(4) }))
-  .use(async ({ next, context }, input) => {
-    if (input.accessCode.trim() !== ACCESS_CODE) {
-      throw new ORPCError("UNAUTHORIZED", { message: "Code d'accès professionnel invalide" });
-    }
-    return next({ context });
-  });
+/**
+ * Toutes les procédures pro exigent le code d'accès du module professionnel.
+ * `guarded()` fabrique la procédure avec le schéma complet en une seule fois :
+ * on ne peut pas rechaîner `.input()` sur une procédure qui en a déjà un.
+ */
+function guarded<T extends z.ZodRawShape>(shape?: T) {
+  return base
+    .input(z.object({ accessCode: z.string().min(4), ...((shape ?? {}) as T) }))
+    .use(async ({ next, context }, input: unknown) => {
+      const code = (input as { accessCode?: string }).accessCode ?? "";
+      if (code.trim() !== ACCESS_CODE) {
+        throw new ORPCError("UNAUTHORIZED", { message: "Code d'accès professionnel invalide" });
+      }
+      return next({ context });
+    });
+}
+
+/** Procédure pro sans autre entrée que le code d'accès. */
+const guard = guarded();
 
 function newApiKey() {
   const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -96,124 +106,118 @@ export const pro = {
 
   /** Candidatures transporteurs */
   applications: guard.handler(() =>
-    db.select().from(schema.carrierApplications).orderBy(desc(schema.carrierApplications.createdAt)).limit(100),
+    db
+      .select()
+      .from(schema.carrierApplications)
+      .orderBy(desc(schema.carrierApplications.createdAt))
+      .limit(100),
   ),
 
   /** Changement de statut d'un devis */
-  setQuoteStatus: guard
-    .input(
-      z.object({
-        accessCode: z.string(),
-        ref: z.string(),
-        status: z.enum(["nouveau", "accepte", "paye", "en_cours", "livre", "annule"]),
-      }),
-    )
-    .handler(async ({ input }) => {
-      await db.update(schema.quotes).set({ status: input.status }).where(eq(schema.quotes.ref, input.ref));
-      return { ok: true };
-    }),
+  setQuoteStatus: guarded({
+    ref: z.string(),
+    status: z.enum(["nouveau", "accepte", "paye", "en_cours", "livre", "annule"]),
+  }).handler(async ({ input }) => {
+    await db
+      .update(schema.quotes)
+      .set({ status: input.status })
+      .where(eq(schema.quotes.ref, input.ref));
+    return { ok: true };
+  }),
 
   /* ---------------- Clés API ---------------- */
-  apiKeys: guard.handler(() => db.select().from(schema.apiKeys).orderBy(desc(schema.apiKeys.createdAt))),
+  apiKeys: guard.handler(() =>
+    db.select().from(schema.apiKeys).orderBy(desc(schema.apiKeys.createdAt)),
+  ),
 
-  createApiKey: guard
-    .input(z.object({ accessCode: z.string(), label: z.string().min(2).max(60) }))
-    .handler(async ({ input }) => {
-      const [row] = await db.insert(schema.apiKeys).values({ label: input.label, key: newApiKey() }).returning();
-      return row;
-    }),
+  createApiKey: guarded({ label: z.string().min(2).max(60) }).handler(async ({ input }) => {
+    const [row] = await db
+      .insert(schema.apiKeys)
+      .values({ label: input.label, key: newApiKey() })
+      .returning();
+    return row;
+  }),
 
-  revokeApiKey: guard
-    .input(z.object({ accessCode: z.string(), id: z.number() }))
-    .handler(async ({ input }) => {
-      await db.update(schema.apiKeys).set({ revoked: true }).where(eq(schema.apiKeys.id, input.id));
-      return { ok: true };
-    }),
+  revokeApiKey: guarded({ id: z.number() }).handler(async ({ input }) => {
+    await db.update(schema.apiKeys).set({ revoked: true }).where(eq(schema.apiKeys.id, input.id));
+    return { ok: true };
+  }),
 
   /* ---------------- Webhooks ---------------- */
-  webhooks: guard.handler(() => db.select().from(schema.webhooks).orderBy(desc(schema.webhooks.createdAt))),
+  webhooks: guard.handler(() =>
+    db.select().from(schema.webhooks).orderBy(desc(schema.webhooks.createdAt)),
+  ),
 
-  createWebhook: guard
-    .input(
-      z.object({
-        accessCode: z.string(),
-        url: z.string().url(),
-        events: z.string().min(3).default("tracking.updated"),
-      }),
-    )
-    .handler(async ({ input }) => {
-      const [row] = await db
-        .insert(schema.webhooks)
-        .values({ url: input.url, events: input.events, secret: `whsec_${generateRef("")}${generateRef("")}` })
-        .returning();
-      return row;
-    }),
+  createWebhook: guarded({
+    url: z.string().url(),
+    events: z.string().min(3).default("tracking.updated"),
+  }).handler(async ({ input }) => {
+    const [row] = await db
+      .insert(schema.webhooks)
+      .values({
+        url: input.url,
+        events: input.events,
+        secret: `whsec_${generateRef("")}${generateRef("")}`,
+      })
+      .returning();
+    return row;
+  }),
 
-  deleteWebhook: guard
-    .input(z.object({ accessCode: z.string(), id: z.number() }))
-    .handler(async ({ input }) => {
-      await db.delete(schema.webhooks).where(eq(schema.webhooks.id, input.id));
-      return { ok: true };
-    }),
+  deleteWebhook: guarded({ id: z.number() }).handler(async ({ input }) => {
+    await db.delete(schema.webhooks).where(eq(schema.webhooks.id, input.id));
+    return { ok: true };
+  }),
 
   /* ---------------- Livreurs ---------------- */
-  drivers: guard.handler(() => db.select().from(schema.drivers).orderBy(desc(schema.drivers.createdAt))),
+  drivers: guard.handler(() =>
+    db.select().from(schema.drivers).orderBy(desc(schema.drivers.createdAt)),
+  ),
 
-  createDriver: guard
-    .input(
-      z.object({
-        accessCode: z.string(),
-        name: z.string().min(2),
-        email: z.string().email(),
-        phone: z.string().optional(),
-        vehicle: z.string().optional(),
-        city: z.string().optional(),
-      }),
-    )
-    .handler(async ({ input }) => {
-      const code = generateRef("").slice(0, 6);
-      const [row] = await db
-        .insert(schema.drivers)
-        .values({
-          name: input.name,
-          email: input.email.toLowerCase(),
-          phone: input.phone,
-          vehicle: input.vehicle,
-          city: input.city,
-          code,
-        })
-        .returning();
-      return row;
-    }),
+  createDriver: guarded({
+    name: z.string().min(2),
+    email: z.string().email(),
+    phone: z.string().optional(),
+    vehicle: z.string().optional(),
+    city: z.string().optional(),
+  }).handler(async ({ input }) => {
+    const code = generateRef("").slice(0, 6);
+    const [row] = await db
+      .insert(schema.drivers)
+      .values({
+        name: input.name,
+        email: input.email.toLowerCase(),
+        phone: input.phone,
+        vehicle: input.vehicle,
+        city: input.city,
+        code,
+      })
+      .returning();
+    return row;
+  }),
 
   /** Assignation d'une course à un livreur */
-  assignJob: guard
-    .input(
-      z.object({
-        accessCode: z.string(),
-        driverId: z.number(),
-        trackingNumber: z.string().min(4),
-        pickupAddress: z.string().min(3),
-        dropAddress: z.string().min(3),
-        recipientName: z.string().optional(),
-        recipientPhone: z.string().optional(),
-        payoutCents: z.number().min(0).optional(),
-      }),
-    )
-    .handler(async ({ input }) => {
-      const [row] = await db
-        .insert(schema.driverJobs)
-        .values({
-          driverId: input.driverId,
-          trackingNumber: input.trackingNumber.toUpperCase(),
-          pickupAddress: input.pickupAddress,
-          dropAddress: input.dropAddress,
-          recipientName: input.recipientName,
-          recipientPhone: input.recipientPhone,
-          payoutCents: input.payoutCents,
-          scheduledAt: new Date(),
-        })
-        .returning();
-      return row;
-    }),
+  assignJob: guarded({
+    driverId: z.number(),
+    trackingNumber: z.string().min(4),
+    pickupAddress: z.string().min(3),
+    dropAddress: z.string().min(3),
+    recipientName: z.string().optional(),
+    recipientPhone: z.string().optional(),
+    payoutCents: z.number().min(0).optional(),
+  }).handler(async ({ input }) => {
+    const [row] = await db
+      .insert(schema.driverJobs)
+      .values({
+        driverId: input.driverId,
+        trackingNumber: input.trackingNumber.toUpperCase(),
+        pickupAddress: input.pickupAddress,
+        dropAddress: input.dropAddress,
+        recipientName: input.recipientName,
+        recipientPhone: input.recipientPhone,
+        payoutCents: input.payoutCents,
+        scheduledAt: new Date(),
+      })
+      .returning();
+    return row;
+  }),
 };
