@@ -210,3 +210,14 @@ Colis / international (`packages/web/src/api/lib/posts-colis.ts`) :
 - [ ] UptimeRobot (surveillance externe), sauvegardes hors serveur, snapshot hPanel
 - [ ] Dossier technique myPOS E_IPC_ERROR — 5e relance, sinon chiffrer la bascule Stripe
 - [ ] Répercuter l'adresse 1 rue de Stockholm dans fiche-google-business.report/content.md
+
+## Autonomie vis-a-vis de la plateforme (fait)
+- Chat IA : OpenAI direct (OPENAI_API_KEY, modele via AI_MODEL, defaut gpt-5.4-mini). Plus de passerelle managee.
+- Analytics : Google Analytics 4 (VITE_GA4_MEASUREMENT_ID) via packages/web/vite/plugins/ga4-plugin.ts, Consent Mode v2 branche sur le bandeau cookies existant.
+- Bundle de production : @runablehq/website-runtime alias vers un stub vide (packages/web/vite/stubs/website-runtime.tsx). 0 occurrence de "runable" dans le JS publie.
+- mobile/desktop : CONSERVES dans l'atelier (le lint runkit exige leur presence) mais exclus du deploiement (ops/deploy.sh) et effaces du serveur.
+- .env de production nettoye des variables de la plateforme ; sauvegarde /root/env-avant-autonomie.bak.
+- Sauvegardes : /usr/local/bin/lbg-backup.sh etendu (base + uploads livreurs + config), timer 03h30, retention 14 j, log /var/log/lbg-backup.log.
+- Docs : GUIDE-EXPLOITATION.md + .env.example. Scripts versionnes dans ops/.
+- Git : .env.bak retire du suivi ET de tout l'historique (filter-branch), force-push sur origin.
+- A FAIRE PAR LE CLIENT : faire tourner les cles qui ont ete exposees dans l'ancien historique GitHub (Resend, myPOS, Google Maps, BETTER_AUTH_SECRET, CRON_SECRET, PRO_ACCESS_CODE).
