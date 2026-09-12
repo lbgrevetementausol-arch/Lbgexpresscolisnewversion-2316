@@ -409,3 +409,39 @@ Demande : après un paiement myPOS, le client reçoit sa facture en PDF brandé 
 Test de rendu : PDF généré depuis `FA-2026-0001` en local, converti en PNG et contrôlé visuellement (logo, accents, alignement des colonnes, totaux 97,50 / 19,50 / 117,00). Lint 0/0, build OK, déployé.
 
 ⚠️ **Toujours non prouvé de bout en bout** : il faut un vrai paiement carte à petit montant pour confirmer d'un coup que myPOS appelle bien le webhook, que la facture bascule en `payee`, que le PDF arrive par mail et que l'adresse entre en base.
+
+### Tracking publicitaire : GTM remplace + conversion Purchase (fait, 5 sept. 2026)
+- `index.html` : conteneur GTM `GTM-T4SBXXMF` -> **`GTM-PXWLPNZF`** (les 2 emplacements : script `<head>` + `<noscript>` `<body>`). Pixel Meta `1186689563634885` inchange.
+- `src/web/lib/pixels.ts` : ajout de `trackPurchase()` (event `Purchase`, devise EUR).
+- `src/web/pages/paiement-retour.tsx` : charge la facture via `useInvoice()` et envoie `Purchase` avec `value` (totalCents/100) + `transaction_id` (numero de facture). Dedoublonnage par cle localStorage `lbg-purchase-<ref>` : un rechargement de la page ne recompte pas la vente.
+- Evenements desormais couverts : `Lead` (devis), `InitiateCheckout` (clic paiement), `Purchase` (retour myPOS), `CompleteRegistration` (inscription), `Contact` (aide + transporteur).
+- Zones tarifaires `europe`/`maghreb`/`monde` : **conservees** sur decision de l'utilisateur (il livre ailleurs sur devis). Consequence pub : cibler geographiquement les campagnes.
+- Lint 0/0, build OK, deploye en prod. Verifie : `curl https://www.lbgexpresscolis.fr/` renvoie bien `GTM-PXWLPNZF`.
+- Reste a faire cote interfaces (pas de code) : tag GA4 dans GTM, verification du domaine dans Meta Business Manager, compte Google Ads + import de la conversion.
+
+## 2026-09-12 — Espace livreur : vérification complète
+- Lint 0 erreur, tsc OK, build OK.
+- Bug corrigé : route GET /api/driver/document utilisait `Bun.file` (crash 500 en dev Vite/node) → remplacé par `node:fs/promises.readFile`.
+- Bug corrigé : driverAdmin.setActive passait `available: undefined` → `.set()` conditionnel.
+- Testé en navigateur sur /admin (onglet Livreurs) : Dossiers livreurs + Courses proposées s'affichent ;
+  boutons Valider / Refuser / Désactiver / Réactiver / Renvoyer / Annuler testés en conditions réelles → OK.
+- Lecture d'un document : 200 + image/png avec Bearer admin, 403 sans auth.
+- Données de test supprimées de local.db (driver 3, offre 1, job 4).
+- BLOQUANT externe : Resend refuse tous les envois — "lbgexpresscolis.fr domain is not verified" (403),
+  présent aussi en prod (/var/log/lbg-express.log). La clé API est "restricted to only send emails"
+  donc impossible de diagnostiquer le domaine depuis le sandbox. Affecte TOUS les emails du site.
+- Reste : déploiement prod (schéma DB + UPLOADS_DIR + code), commit git.
+
+## 2026-09-12 (suite) — Resend vérifié + déploiement prod
+- DNS Hostinger corrigés : TXT resend._domainkey (DKIM), CNAME send -> send.forge.rmta.net,
+  CNAME rsend -> rsend-euw1.forge.rmta.net. Anciens enregistrements Amazon SES sur "send"
+  (TXT spf + MX feedback-smtp) supprimés car ils bloquaient le CNAME.
+- Domaine lbgexpresscolis.fr : status "verified" chez Resend. Envoi réel testé OK (id retourné).
+- Part livreur désormais réglable au back-office : clé site_settings "driver_share_percent" (défaut 70).
+- /devenir-transporteur redirige vers /livreur (Redirect wouter + sitemap mis à jour).
+- Déployé en prod : schéma DB appliqué, UPLOADS_DIR=/var/lib/lbg-express/uploads (700).
+- Parcours testé EN PRODUCTION : upload 2 docs, inscription, renvoi de code, vérification e-mail,
+  mot de passe oublié -> tous OK, aucune erreur e-mail dans /var/log/lbg-express.log.
+- Données de test supprimées de la base prod (0 driver, 0 upload).
+- Clé API Resend full access révoquée après diagnostic ; .env.resend supprimé.
+- Reste : commit git.

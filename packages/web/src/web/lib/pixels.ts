@@ -46,6 +46,11 @@ export function trackSignup(params: Params = {}) {
   trackEvent("CompleteRegistration", params);
 }
 
+/** Paiement encaisse (retour myPOS). Envoye une seule fois par facture. */
+export function trackPurchase(params: Params = {}) {
+  trackEvent("Purchase", { currency: "EUR", ...params });
+}
+
 /** Message de contact ou candidature transporteur. */
 export function trackContact(params: Params = {}) {
   trackEvent("Contact", params);

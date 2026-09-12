@@ -3,6 +3,7 @@
  * Utilisé par le moteur tarifaire : la surcharge carburant, l'assurance, la TVA
  * et les pénalités d'accès sont modifiables sans redéploiement.
  */
+import { eq } from "drizzle-orm";
 import { db } from "../database";
 import * as schema from "../database/schema";
 import { DEFAULT_PRICING, type PricingConfig } from "./pricing";
@@ -25,6 +26,29 @@ export const PRICING_KEYS: Record<keyof PricingConfig, { key: string; label: str
 
 const CACHE_MS = 30_000;
 let cache: { at: number; config: PricingConfig } | null = null;
+
+/**
+ * Part de la rémunération reversée au livreur, en % du prix payé par le client.
+ * Modifiable depuis le back-office (Contenu & tarifs) sans redéploiement.
+ */
+export const DRIVER_SHARE_KEY = "driver_share_percent";
+export const DEFAULT_DRIVER_SHARE_PERCENT = 70;
+
+/** Part livreur courante, en fraction (0.7 = 70 %). */
+export async function getDriverShare(): Promise<number> {
+  try {
+    const [row] = await db
+      .select()
+      .from(schema.siteSettings)
+      .where(eq(schema.siteSettings.key, DRIVER_SHARE_KEY))
+      .limit(1);
+    const parsed = Number(String(row?.value ?? "").replace(",", "."));
+    if (Number.isFinite(parsed) && parsed > 0 && parsed <= 100) return parsed / 100;
+  } catch {
+    // base indisponible : on retombe sur la valeur par défaut
+  }
+  return DEFAULT_DRIVER_SHARE_PERCENT / 100;
+}
 
 /** Vide le cache après une sauvegarde de réglages. */
 export function invalidatePricingConfig() {
@@ -55,7 +79,7 @@ export async function getPricingConfig(): Promise<PricingConfig> {
 
 /** Valeurs par défaut à insérer dans site_settings (seed / première ouverture de l'admin). */
 export function defaultPricingSettings() {
-  return (Object.entries(PRICING_KEYS) as [keyof PricingConfig, { key: string; label: string }][]).map(
+  const rows = (Object.entries(PRICING_KEYS) as [keyof PricingConfig, { key: string; label: string }][]).map(
     ([field, meta]) => ({
       key: meta.key,
       value: String(DEFAULT_PRICING[field]),
@@ -63,4 +87,11 @@ export function defaultPricingSettings() {
       label: meta.label,
     }),
   );
+  rows.push({
+    key: DRIVER_SHARE_KEY,
+    value: String(DEFAULT_DRIVER_SHARE_PERCENT),
+    group: "tarifs",
+    label: "Part livreur (% du prix payé par le client)",
+  });
+  return rows;
 }

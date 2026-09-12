@@ -2,6 +2,7 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "../database";
 import * as schema from "../database/schema";
 import { mailInvoicePaid } from "./email";
+import { publishJobOffer } from "./job-offers";
 import { buildInvoicePdf } from "../lib/invoice-pdf";
 import { unsubscribeUrl } from "../lib/unsubscribe-token";
 
@@ -62,6 +63,8 @@ export async function settleMyposPayment(input: SettleInput): Promise<SettleResu
       payerEmail: invoice.customerEmail,
     });
     await db.update(schema.quotes).set({ status: "paye" }).where(eq(schema.quotes.ref, invoice.quoteRef));
+    // Commande payée par carte → publication de la course aux livreurs disponibles.
+    await publishJobOffer(invoice.quoteRef).catch(() => null);
   }
 
   await db.insert(schema.auditLog).values({

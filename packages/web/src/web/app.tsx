@@ -1,4 +1,4 @@
-import { Route, Switch } from "wouter";
+import { Redirect, Route, Switch } from "wouter";
 import { Provider } from "./components/provider";
 import { Layout } from "./components/site/layout";
 import { AgentFeedback } from "@runablehq/website-runtime";
@@ -14,7 +14,6 @@ import FaqPage from "./pages/faq";
 import AidePage from "./pages/aide";
 import BlogPage from "./pages/blog";
 import BlogPostPage from "./pages/blog-post";
-import TransporteurPage from "./pages/transporteur";
 import LivreurPage from "./pages/livreur";
 import ProPage from "./pages/pro";
 import PaiementPage from "./pages/paiement";
@@ -44,7 +43,8 @@ function App() {
           <Route path="/aide" component={AidePage} />
           <Route path="/blog" component={BlogPage} />
           <Route path="/blog/:slug" component={BlogPostPage} />
-          <Route path="/devenir-transporteur" component={TransporteurPage} />
+          {/* Ancien formulaire transporteur : redirigé vers l'inscription livreur complète. */}
+          <Route path="/devenir-transporteur">{() => <Redirect to="/livreur" replace />}</Route>
           <Route path="/livreur" component={LivreurPage} />
           <Route path="/pro" component={ProPage} />
           <Route path="/paiement/retour" component={PaiementRetourPage} />

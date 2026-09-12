@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import type { RouterClient } from "@orpc/server";
 import { createAgentUIStreamResponse } from "ai";
 import { createApp } from "./__core/app";
@@ -10,8 +11,12 @@ import { db } from "./database";
 import * as schema from "./database/schema";
 import { eq } from "drizzle-orm";
 import { runReviewRequests } from "./services/review-requests";
+import { auth as betterAuth } from "./auth";
+import { MAX_DOC_BYTES, contentTypeFor, docPath, saveDoc } from "./lib/driver-docs";
 import { admin } from "./routes/admin";
 import { content } from "./routes/content";
+import { driverAccount } from "./routes/driver-account";
+import { driverAdmin } from "./routes/driver-admin";
 import { drivers } from "./routes/drivers";
 import { invoices } from "./routes/invoices";
 import { ping } from "./routes/ping";
@@ -32,6 +37,8 @@ export const router = {
   quotes,
   tracking,
   drivers,
+  driverAccount,
+  driverAdmin,
   pro,
   content,
   admin,
@@ -157,6 +164,41 @@ app.get("/api/newsletter/unsubscribe", async (c) => {
     .where(eq(schema.newsletterSubscribers.email, email));
   const page = unsubscribePage("Désinscription confirmée", `L'adresse <strong>${email.replace(/</g, "&lt;")}</strong> ne recevra plus nos actualités. Vous continuerez à recevoir les e-mails liés à vos commandes et à vos factures.`, 200);
   return c.html(page.html, page.status);
+});
+
+/**
+ * Téléversement d'une pièce justificative livreur (permis, identité, carte grise).
+ * Route HTTP car multipart : oRPC ne transporte pas de fichier binaire.
+ * Les fichiers sont écrits hors du dossier public et ne sont jamais servis en direct.
+ */
+app.post("/api/driver/document", async (c) => {
+  const form = await c.req.parseBody().catch(() => null);
+  const file = form?.file;
+  if (!(file instanceof File)) return c.json({ ok: false, error: "Aucun fichier reçu" }, 400);
+  if (file.size > MAX_DOC_BYTES) return c.json({ ok: false, error: "Fichier trop lourd (8 Mo maximum)" }, 413);
+  try {
+    const key = await saveDoc(await file.arrayBuffer(), file.type);
+    return c.json({ ok: true, key }, 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "erreur inconnue";
+    return c.json({ ok: false, error: message }, 400);
+  }
+});
+
+/** Lecture d'une pièce justificative — réservée à une session administrateur. */
+app.get("/api/driver/document/:key", async (c) => {
+  const session = await betterAuth.api.getSession({ headers: c.req.raw.headers });
+  if (!session || (session.user as { role?: string | null }).role !== "admin") {
+    return c.json({ ok: false, error: "Accès réservé à l'administration" }, 403);
+  }
+  const key = c.req.param("key");
+  const full = docPath(key);
+  if (!full) return c.json({ ok: false, error: "Clé invalide" }, 400);
+  const bytes = await readFile(full).catch(() => null);
+  if (!bytes) return c.json({ ok: false, error: "Document introuvable" }, 404);
+  return new Response(new Uint8Array(bytes), {
+    headers: { "Content-Type": contentTypeFor(key), "Cache-Control": "private, no-store" },
+  });
 });
 
 export default app;

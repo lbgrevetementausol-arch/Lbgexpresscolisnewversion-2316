@@ -5,13 +5,14 @@ import { Card } from "../site/section";
 import { Field, Input, Select } from "../site/field";
 import { useProToken } from "../../queries/admin";
 import { useAssignJob, useCreateDriver, useProDrivers } from "../../queries/pro";
+import { DriverApprovalsPanel, JobOffersPanel } from "./driver-approvals";
 
 const th = "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted whitespace-nowrap";
 const td = "px-4 py-3 text-sm align-top";
 
 /** Livreurs + attribution des courses — fusionné depuis l'ancien espace /pro. */
 export function DriversPanel() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const token = useProToken(true);
   const code = token.data?.code ?? null;
 
@@ -44,10 +45,13 @@ export function DriversPanel() {
 
   return (
     <div className="grid gap-6">
+      <DriverApprovalsPanel />
+      <JobOffersPanel lang={lang} />
+
       <Card hover={false} className="overflow-hidden p-0">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-5">
           <h3 className="font-display text-base font-bold">
-            {t({ fr: "Livreurs", en: "Drivers" })}
+            {t({ fr: "Livreurs (comptes créés manuellement)", en: "Drivers (manually created)" })}
             <span className="ml-2 text-muted">({drivers.data?.length ?? 0})</span>
           </h3>
         </div>

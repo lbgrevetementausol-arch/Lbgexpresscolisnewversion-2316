@@ -334,3 +334,122 @@ export async function mailTrackingUpdate(args: {
   );
   return sendEmail({ to: args.to, subject: `${args.trackingNumber} — ${STATUS[args.status] ?? args.status}`, html });
 }
+
+/* ------------------------------------------------------------------ */
+/*                        E-mails espace livreur                       */
+/* ------------------------------------------------------------------ */
+
+/** 9. Code à 6 chiffres pour vérifier l'adresse e-mail d'un livreur. */
+export async function mailDriverVerify(args: { to: string; name: string; code: string }) {
+  const html = layout(
+    "Vérifiez votre adresse e-mail",
+    `<p>Bonjour ${esc(args.name)},</p>
+     <p>Votre inscription comme livreur partenaire LBG Express Colis est enregistrée. Saisissez ce code sur la page de vérification pour confirmer votre adresse :</p>
+     <p style="margin:22px 0;font-size:32px;font-weight:bold;letter-spacing:8px;color:#ffffff">${esc(args.code)}</p>
+     <p>Ce code expire dans 30 minutes. Une fois votre adresse confirmée, notre équipe contrôle vos documents (permis, pièce d'identité, véhicule) et active votre compte.</p>`,
+    { label: "Vérifier mon adresse", href: `${SITE}/livreur?verif=1` },
+  );
+  return sendEmail({ to: args.to, subject: `Votre code de vérification : ${args.code}`, html });
+}
+
+/** 10. Compte livreur validé (ou refusé) par l'administration. */
+export async function mailDriverApproval(args: {
+  to: string;
+  name: string;
+  approved: boolean;
+  note?: string | null;
+}) {
+  const html = args.approved
+    ? layout(
+        "Votre compte livreur est activé",
+        `<p>Bonjour ${esc(args.name)},</p>
+         <p>Vos documents ont été validés. Vous pouvez dès maintenant vous connecter à votre espace livreur, vous déclarer <strong>disponible</strong> et recevoir les courses proposées par e-mail.</p>
+         <p>Première course : dès qu'une commande est payée, vous recevez un e-mail. Le premier livreur qui accepte l'obtient.</p>`,
+        { label: "Accéder à mon espace", href: `${SITE}/livreur` },
+      )
+    : layout(
+        "Votre candidature livreur",
+        `<p>Bonjour ${esc(args.name)},</p>
+         <p>Après examen de votre dossier, nous ne pouvons pas activer votre compte livreur pour le moment.</p>
+         ${args.note ? `<p><strong>Motif :</strong> ${esc(args.note)}</p>` : ""}
+         <p>Vous pouvez nous répondre à cet e-mail si vous souhaitez compléter votre dossier.</p>`,
+      );
+  return sendEmail({
+    to: args.to,
+    subject: args.approved ? "Compte livreur activé — LBG Express Colis" : "Votre candidature livreur — LBG Express Colis",
+    html,
+  });
+}
+
+/** 11. Lien de réinitialisation du mot de passe livreur. */
+export async function mailDriverReset(args: { to: string; name: string; url: string }) {
+  const html = layout(
+    "Réinitialiser votre mot de passe",
+    `<p>Bonjour ${esc(args.name)},</p>
+     <p>Vous avez demandé un nouveau mot de passe pour votre espace livreur. Ce lien est valable 1 heure :</p>
+     <p style="font-size:12px;color:#8296b5;word-break:break-all">${esc(args.url)}</p>
+     <p>Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail : votre mot de passe reste inchangé.</p>`,
+    { label: "Choisir un nouveau mot de passe", href: args.url },
+  );
+  return sendEmail({ to: args.to, subject: "Réinitialisation de votre mot de passe livreur", html });
+}
+
+/** 12. Nouvelle course disponible, envoyée à tous les livreurs disponibles. */
+export async function mailJobOffer(args: {
+  to: string;
+  name: string;
+  trackingNumber: string;
+  pickup: string;
+  drop: string;
+  service?: string | null;
+  weightKg?: number | null;
+  volumeM3?: number | null;
+  payoutCents?: number | null;
+  scheduledAt?: Date | null;
+}) {
+  const html = layout(
+    "Nouvelle course disponible",
+    `<p>Bonjour ${esc(args.name)},</p>
+     <p>Une commande vient d'être payée et cherche un livreur. <strong>Premier arrivé, premier servi</strong> : la course est attribuée au premier qui l'accepte.</p>
+     ${table(
+       row("Référence", args.trackingNumber) +
+         row("Enlèvement", args.pickup) +
+         row("Livraison", args.drop) +
+         row("Prestation", args.service) +
+         row("Poids", args.weightKg ? `${args.weightKg} kg` : null) +
+         row("Volume", args.volumeM3 ? `${args.volumeM3} m³` : null) +
+         row("Rémunération", args.payoutCents ? euro(args.payoutCents) : null) +
+         row("Créneau", args.scheduledAt ? args.scheduledAt.toLocaleString("fr-FR") : null),
+     )}`,
+    { label: "Voir et accepter la course", href: `${SITE}/livreur?course=${encodeURIComponent(args.trackingNumber)}` },
+  );
+  return sendEmail({ to: args.to, subject: `Course disponible ${args.trackingNumber} — ${args.drop}`, html });
+}
+
+/** 13. Confirmation au livreur qui a décroché la course. */
+export async function mailJobAssigned(args: {
+  to: string;
+  name: string;
+  trackingNumber: string;
+  pickup: string;
+  drop: string;
+  recipientName?: string | null;
+  recipientPhone?: string | null;
+  scheduledAt?: Date | null;
+}) {
+  const html = layout(
+    `Course ${args.trackingNumber} attribuée`,
+    `<p>Bonjour ${esc(args.name)},</p>
+     <p>La course est à vous. Les coordonnées du destinataire :</p>
+     ${table(
+       row("Enlèvement", args.pickup) +
+         row("Livraison", args.drop) +
+         row("Destinataire", args.recipientName) +
+         row("Téléphone", args.recipientPhone) +
+         row("Créneau", args.scheduledAt ? args.scheduledAt.toLocaleString("fr-FR") : null),
+     )}
+     <p>Pensez à mettre à jour le statut depuis votre espace à chaque étape : le client suit sa livraison en direct.</p>`,
+    { label: "Ouvrir ma tournée", href: `${SITE}/livreur` },
+  );
+  return sendEmail({ to: args.to, subject: `Course ${args.trackingNumber} confirmée`, html });
+}

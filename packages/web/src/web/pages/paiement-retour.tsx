@@ -1,9 +1,11 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "wouter";
 import { Clock, Phone, ShieldCheck } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 import { CONTACT, whatsappLink } from "../lib/format";
 import { rememberedMyposInvoice } from "../lib/mypos";
+import { trackPurchase } from "../lib/pixels";
+import { useInvoice } from "../queries/invoices";
 import { Card, Section } from "../components/site/section";
 import { PageHero } from "../components/site/layout";
 
@@ -16,6 +18,22 @@ export default function PaiementRetourPage() {
   // est repris du sessionStorage posé juste avant le départ vers le terminal.
   const invoice = useMemo(() => params.get("facture") || rememberedMyposInvoice(), [params]);
   const cancelled = location.startsWith("/paiement/annule") || params.get("statut") === "annule";
+
+  // Conversion Purchase (Meta Pixel + GTM), une seule fois par facture meme si
+  // le client recharge la page de retour.
+  const paid = useInvoice(!cancelled && invoice ? invoice : null);
+  const total = paid.data?.invoice.totalCents;
+  useEffect(() => {
+    if (cancelled || !invoice || typeof total !== "number") return;
+    const key = `lbg-purchase-${invoice}`;
+    try {
+      if (window.localStorage.getItem(key)) return;
+      window.localStorage.setItem(key, "1");
+    } catch {
+      // navigation privee : on accepte le risque d'un doublon plutot que de perdre la conversion
+    }
+    trackPurchase({ value: total / 100, transaction_id: invoice });
+  }, [cancelled, invoice, total]);
 
   return (
     <>

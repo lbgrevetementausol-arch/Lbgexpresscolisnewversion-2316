@@ -110,6 +110,59 @@ export const drivers = sqliteTable("drivers", {
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
+
+  // — Compte livreur autonome (inscription depuis le site) —
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  whatsapp: text("whatsapp"),
+  address: text("address"),
+  plate: text("plate"),
+  siret: text("siret"),
+  passwordHash: text("password_hash"),
+  /** Documents : clés de fichiers servies uniquement à l'admin authentifié. */
+  licenseKey: text("license_key"),
+  idPhotoKey: text("id_photo_key"),
+  vehicleDocKey: text("vehicle_doc_key"),
+  /** Vérification de l'adresse e-mail par code à 6 chiffres. */
+  emailVerified: integer("email_verified", { mode: "boolean" }).notNull().default(false),
+  verifyCode: text("verify_code"),
+  verifyExpiresAt: integer("verify_expires_at", { mode: "timestamp" }),
+  /** Réinitialisation de mot de passe. */
+  resetToken: text("reset_token"),
+  resetExpiresAt: integer("reset_expires_at", { mode: "timestamp" }),
+  /** Validation des documents par l'administration : en_attente | valide | refuse. */
+  approvalStatus: text("approval_status").notNull().default("valide"),
+  approvalNote: text("approval_note"),
+  approvedAt: integer("approved_at", { mode: "timestamp" }),
+  /** Le livreur se déclare disponible pour recevoir des courses. */
+  available: integer("available", { mode: "boolean" }).notNull().default(false),
+  availableSince: integer("available_since", { mode: "timestamp" }),
+  lastLoginAt: integer("last_login_at", { mode: "timestamp" }),
+});
+
+/** Courses publiées à tous les livreurs disponibles — premier arrivé, premier servi. */
+export const jobOffers = sqliteTable("job_offers", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  trackingNumber: text("tracking_number").notNull().unique(),
+  quoteRef: text("quote_ref"),
+  service: text("service"),
+  kind: text("kind"),
+  pickupAddress: text("pickup_address").notNull(),
+  dropAddress: text("drop_address").notNull(),
+  recipientName: text("recipient_name"),
+  recipientPhone: text("recipient_phone"),
+  weightKg: real("weight_kg"),
+  volumeM3: real("volume_m3"),
+  payoutCents: integer("payout_cents"),
+  scheduledAt: integer("scheduled_at", { mode: "timestamp" }),
+  /** ouverte | attribuee | annulee */
+  status: text("status").notNull().default("ouverte"),
+  acceptedDriverId: integer("accepted_driver_id"),
+  acceptedAt: integer("accepted_at", { mode: "timestamp" }),
+  notifiedCount: integer("notified_count").notNull().default(0),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
 });
 
 /** Courses assignées à un livreur */

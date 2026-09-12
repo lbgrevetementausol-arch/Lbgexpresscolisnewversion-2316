@@ -9,27 +9,19 @@ import {
   Navigation,
   Package,
   Phone,
-  Truck,
 } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 import { useSeo } from "../lib/seo";
 import { SEO_ROUTES } from "../lib/seo-routes";
-import { CONTACT, dateTime, moneyCents } from "../lib/format";
+import { dateTime, moneyCents } from "../lib/format";
 import { PageHero } from "../components/site/layout";
 import { Card, Section } from "../components/site/section";
-import { Field, Input, Textarea } from "../components/site/field";
-import { useDriverHistory, useDriverJobs, useDriverLogin, usePushDriverLocation, useUpdateJob } from "../queries/drivers";
+import { Textarea } from "../components/site/field";
+import { useDriverHistory, useDriverJobs, usePushDriverLocation, useUpdateJob } from "../queries/drivers";
+import { DriverAuth, type DriverSession } from "../components/driver/driver-auth";
+import { AvailabilityCard, OffersPanel, PendingApprovalCard } from "../components/driver/driver-offers";
 
 const STORAGE_KEY = "lbg-driver";
-
-interface DriverSession {
-  id: number;
-  name: string;
-  email: string;
-  vehicle: string | null;
-  city: string | null;
-  token: string;
-}
 
 type JobStatus = "a_recuperer" | "en_route" | "en_livraison" | "livre" | "incident";
 
@@ -55,7 +47,8 @@ function readSession(): DriverSession | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as DriverSession;
-    return parsed && typeof parsed.token === "string" && parsed.token.length > 10 ? parsed : null;
+    if (!parsed || typeof parsed.token !== "string" || parsed.token.length <= 10) return null;
+    return { ...parsed, approvalStatus: parsed.approvalStatus ?? "valide", available: parsed.available ?? false };
   } catch {
     return null;
   }
@@ -65,11 +58,15 @@ export default function LivreurPage() {
   const { t, lang } = useI18n();
   useSeo(SEO_ROUTES["/livreur"]);
   const [session, setSession] = useState<DriverSession | null>(readSession);
+  const resetToken =
+    typeof window === "undefined" ? "" : (new URLSearchParams(window.location.search).get("reset") ?? "");
 
   useEffect(() => {
     if (session) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
     else window.localStorage.removeItem(STORAGE_KEY);
   }, [session]);
+
+  const approved = session?.approvalStatus === "valide";
 
   return (
     <>
@@ -78,17 +75,17 @@ export default function LivreurPage() {
         title={
           session
             ? t({ fr: `Bonjour ${session.name}`, en: `Hello ${session.name}` })
-            : t({ fr: "Vos courses du jour", en: "Your jobs of the day" })
+            : t({ fr: "Devenez livreur partenaire", en: "Become a partner driver" })
         }
         lead={
           session
             ? t({
-                fr: "Mettez à jour chaque course : le client voit le changement en direct sur sa page de suivi.",
-                en: "Update each job: the customer sees the change live on their tracking page.",
+                fr: "Mettez-vous disponible, acceptez les courses payées et tenez le client informé en direct.",
+                en: "Go available, accept paid jobs and keep the customer updated live.",
               })
             : t({
-                fr: "Connectez-vous avec l'email et le code à 6 caractères transmis par l'exploitation.",
-                en: "Sign in with the email and 6-character code given to you by operations.",
+                fr: "Inscrivez-vous avec vos documents, vérifiez votre e-mail, et recevez les courses dès qu'elles sont payées.",
+                en: "Sign up with your documents, verify your email, and receive jobs as soon as they are paid.",
               })
         }
         image="/images/van-night.jpg"
@@ -106,95 +103,27 @@ export default function LivreurPage() {
       </PageHero>
 
       <Section>
-        {session ? (
-          <DriverBoard session={session} lang={lang} />
+        {!session ? (
+          <DriverAuth
+            onLogged={setSession}
+            initialMode={resetToken ? "reset" : "login"}
+            resetToken={resetToken}
+          />
+        ) : !approved ? (
+          <PendingApprovalCard status={session.approvalStatus} />
         ) : (
-          <LoginCard onLogged={setSession} />
+          <div className="grid gap-8">
+            <AvailabilityCard
+              token={session.token}
+              available={session.available}
+              onChange={(available) => setSession({ ...session, available })}
+            />
+            <OffersPanel token={session.token} lang={lang} />
+            <DriverBoard session={session} lang={lang} />
+          </div>
         )}
       </Section>
     </>
-  );
-}
-
-function LoginCard({ onLogged }: { onLogged: (session: DriverSession) => void }) {
-  const { t } = useI18n();
-  const login = useDriverLogin();
-  const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    login.mutate(
-      { email, code },
-      { onSuccess: (driver) => onLogged(driver as DriverSession) },
-    );
-  };
-
-  return (
-    <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-[1.1fr_1fr] md:items-start">
-      <Card hover={false}>
-        <h2 className="font-display text-xl font-bold">{t({ fr: "Connexion livreur", en: "Driver sign-in" })}</h2>
-        <form onSubmit={submit} className="mt-6 grid gap-4">
-          <Field label="Email">
-            <Input
-              required
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="prenom@lbgexpresscolis.fr"
-            />
-          </Field>
-          <Field label={t({ fr: "Code d'accès", en: "Access code" })}>
-            <Input
-              required
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="LBG001"
-              className="tracking-[0.2em]"
-            />
-          </Field>
-
-          {login.isError ? (
-            <p className="flex items-center gap-2 text-sm text-danger">
-              <AlertTriangle className="size-4" />
-              {t({ fr: "Email ou code invalide.", en: "Invalid email or code." })}
-            </p>
-          ) : null}
-
-          <button
-            type="submit"
-            disabled={login.isPending}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary-strong disabled:opacity-60"
-          >
-            {login.isPending ? <Loader2 className="size-4 animate-spin" /> : <Truck className="size-4" />}
-            {t({ fr: "Accéder à mes courses", en: "Open my jobs" })}
-          </button>
-        </form>
-      </Card>
-
-      <Card hover={false}>
-        <h3 className="font-display text-base font-bold">{t({ fr: "Comptes de démonstration", en: "Demo accounts" })}</h3>
-        <ul className="mt-4 grid gap-2 text-sm text-muted">
-          <li className="rounded-xl border border-border bg-surface-2/60 p-3 font-mono text-xs">
-            moussa@lbgexpresscolis.fr · LBG001
-          </li>
-          <li className="rounded-xl border border-border bg-surface-2/60 p-3 font-mono text-xs">
-            sophie@lbgexpresscolis.fr · LBG002
-          </li>
-        </ul>
-        <p className="mt-4 text-sm text-muted">
-          {t({
-            fr: "Code perdu ou compte bloqué ? Appelez l'exploitation, un nouveau code est généré immédiatement.",
-            en: "Lost code or blocked account? Call operations, a new code is issued immediately.",
-          })}
-        </p>
-        <a href={CONTACT.phoneHref} className="mt-2 inline-flex items-center gap-2 font-display font-bold text-primary">
-          <Phone className="size-4" />
-          {CONTACT.phone}
-        </a>
-      </Card>
-    </div>
   );
 }
 

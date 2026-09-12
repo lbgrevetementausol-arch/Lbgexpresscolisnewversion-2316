@@ -3,6 +3,7 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { base } from "../__core/app";
 import { db } from "../database";
+import { publishJobOffer } from "../services/job-offers";
 import * as schema from "../database/schema";
 import { createInvoice, ISSUER, myposUrl, VAT_RATE } from "../lib/invoicing";
 import { buildPurchase, myposConfig, publicBaseUrl } from "../lib/mypos";
@@ -396,6 +397,8 @@ export const invoices = {
           .update(schema.quotes)
           .set({ status: "paye" })
           .where(and(eq(schema.quotes.ref, invoice.quoteRef)));
+        // Commande payée → la course part aux livreurs disponibles.
+        await publishJobOffer(invoice.quoteRef).catch(() => null);
       }
 
       await db.insert(schema.auditLog).values({
