@@ -1,6 +1,6 @@
 import { stepCountIs, ToolLoopAgent } from "ai";
 import dedent from "dedent";
-import { gateway } from "./gateway";
+import { CHAT_MODEL, openai } from "./gateway";
 import { requestHuman, trackParcel } from "./tools";
 
 /**
@@ -8,7 +8,7 @@ import { requestHuman, trackParcel } from "./tools";
  * Règle de fond : il informe et oriente, il ne chiffre jamais et ne promet jamais.
  */
 export const supportAgent = new ToolLoopAgent({
-  model: gateway("anthropic/claude-sonnet-4.6"),
+  model: openai(CHAT_MODEL),
   instructions: [
     {
       role: "system",

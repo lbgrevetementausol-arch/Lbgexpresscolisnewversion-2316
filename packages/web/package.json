@@ -16,6 +16,7 @@
     "db:push": "bun --env-file=../../.env drizzle-kit push"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^4.0.66",
     "@ai-sdk/react": "^4.0.91",
     "@libsql/client": "^0.17.2",
     "@orpc/client": "^1.14.7",

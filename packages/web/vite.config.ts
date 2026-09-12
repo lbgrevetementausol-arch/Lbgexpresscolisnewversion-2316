@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwind from "@tailwindcss/vite";
 import path from "path";
+import ga4Plugin from "./vite/plugins/ga4-plugin";
 import runableAnalyticsPlugin from "./vite/__plugins/runable-analytics-plugin";
 import honoDevPlugin from "./vite/__plugins/hono-dev-plugin";
 import assetOptimizerPlugin from "./vite/__plugins/asset-optimizer-plugin";
@@ -20,7 +21,10 @@ export default defineConfig(({ mode }) => {
     plugins: [
       honoDevPlugin(),
       react(),
-      runableAnalyticsPlugin(),
+      // Analytics : en production, uniquement Google Analytics 4 (compte de
+      // l'entreprise). L'analytics de l'atelier Runable ne sert qu'à l'aperçu
+      // en développement et n'est jamais inclus dans le site publié.
+      ...(mode === "production" ? [ga4Plugin()] : [runableAnalyticsPlugin()]),
       tailwind(),
       assetOptimizerPlugin(),
     ],

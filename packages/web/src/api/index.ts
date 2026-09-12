@@ -3,6 +3,7 @@ import type { RouterClient } from "@orpc/server";
 import { createAgentUIStreamResponse } from "ai";
 import { createApp } from "./__core/app";
 import { supportAgent } from "./agent";
+import { aiConfigured } from "./agent/gateway";
 import { auth } from "./auth";
 import { myposConfig, verifyNotification } from "./lib/mypos";
 import { settleMyposPayment } from "./services/mypos-settlement";
@@ -116,6 +117,14 @@ app.post("/api/webhooks/whatsapp-lead", async (c) => {
 
 /** Chat IA du site — réponse en flux, donc route HTTP simple et non procédure oRPC. */
 app.post("/api/agent/messages", async (c) => {
+  // Sans clé OpenAI le chat ne peut pas répondre : on le dit au lieu de laisser
+  // le flux échouer silencieusement côté navigateur.
+  if (!aiConfigured) {
+    return c.json(
+      { error: "Chat indisponible : OPENAI_API_KEY absente de la configuration du serveur." },
+      503,
+    );
+  }
   const body = await c.req.json().catch(() => null);
   if (!body || !Array.isArray(body.messages)) {
     return c.json({ error: "messages requis" }, 400);
