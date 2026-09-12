@@ -31,6 +31,17 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src/web"),
+        // Le widget d'annotation de l'atelier Runable n'est utile qu'en
+        // développement : en production il est remplacé par un composant vide,
+        // afin que le site publié n'embarque aucun code de la plateforme.
+        ...(mode === "production"
+          ? {
+              "@runablehq/website-runtime": path.resolve(
+                __dirname,
+                "./vite/stubs/website-runtime.tsx",
+              ),
+            }
+          : {}),
       },
     },
     server: {
