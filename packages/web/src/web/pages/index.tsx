@@ -21,6 +21,7 @@ import { PriceCalculator } from "../components/site/price-calculator";
 import { Card, Section, SectionHead } from "../components/site/section";
 import { Reveal } from "../components/site/reveal";
 import { ComparisonTable, ProblemSolution } from "../components/site/solution";
+import { DeliveriesGallery } from "../components/site/deliveries-gallery";
 import { useSeo } from "../lib/seo";
 import { SEO_ROUTES } from "../lib/seo-routes";
 
@@ -443,6 +444,8 @@ function Index() {
           ))}
         </div>
       </Section>
+
+      <DeliveriesGallery />
 
       {/* AVIS TRUSTPILOT */}
       <Section>
