@@ -75,3 +75,4 @@ packages/mobile/scripts/*
 
 local.db
 uploads/
+.env.bak
