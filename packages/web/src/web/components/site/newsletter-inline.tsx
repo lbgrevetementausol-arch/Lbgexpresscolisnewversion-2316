@@ -34,7 +34,9 @@ export function NewsletterInline({ source }: { source: string }) {
 
   return (
     <section className="border-t border-border bg-surface-2/40">
-      <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 sm:py-12">
+      {/* pb généreux : le champ d'inscription est à droite, il ne doit pas passer
+          sous les bulles flottantes (WhatsApp / assistant) ancrées en bas à droite. */}
+      <div className="mx-auto w-full max-w-5xl px-4 pt-10 pb-20 sm:px-6 sm:pt-12 sm:pb-24">
         {subscribe.isSuccess ? (
           <div className="flex items-center justify-center gap-3 text-center">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-success/15 text-success">
