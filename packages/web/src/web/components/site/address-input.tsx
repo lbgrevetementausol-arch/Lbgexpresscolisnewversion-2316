@@ -12,11 +12,17 @@ interface AddressInputProps {
   className?: string;
   /** Restreint l'autocomplétion à un pays (ex. "fr"). Vide = monde entier. */
   country?: string;
+  /** Appelé quand l'utilisateur choisit une suggestion : adresse + coordonnées si connues. */
+  onPlace?: (place: { address: string; lat?: number; lng?: number }) => void;
 }
 
 interface AutocompleteLike {
   addListener: (event: string, cb: () => void) => void;
-  getPlace: () => { formatted_address?: string; name?: string };
+  getPlace: () => {
+    formatted_address?: string;
+    name?: string;
+    geometry?: { location?: { lat: () => number; lng: () => number } };
+  };
 }
 
 /**
@@ -32,11 +38,14 @@ export function AddressInput({
   required,
   className,
   country,
+  onPlace,
 }: AddressInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { ready } = useGoogleMaps();
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const onPlaceRef = useRef(onPlace);
+  onPlaceRef.current = onPlace;
 
   useEffect(() => {
     if (!ready || !inputRef.current) return;
@@ -55,7 +64,7 @@ export function AddressInput({
     if (!g?.maps?.places) return;
 
     const autocomplete = new g.maps.places.Autocomplete(inputRef.current, {
-      fields: ["formatted_address", "name"],
+      fields: ["formatted_address", "name", "geometry"],
       types: ["geocode"],
       ...(country ? { componentRestrictions: { country } } : {}),
     });
@@ -63,6 +72,12 @@ export function AddressInput({
       const place = autocomplete.getPlace();
       const next = place.formatted_address ?? place.name ?? "";
       if (next) onChangeRef.current(next);
+      const loc = place.geometry?.location;
+      onPlaceRef.current?.({
+        address: next,
+        lat: loc ? loc.lat() : undefined,
+        lng: loc ? loc.lng() : undefined,
+      });
     });
   }, [ready, country]);
 
@@ -72,7 +87,10 @@ export function AddressInput({
       id={id}
       required={required}
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => {
+        onChange(e.target.value);
+        onPlaceRef.current?.({ address: e.target.value });
+      }}
       placeholder={placeholder}
       aria-label={placeholder ?? "Adresse"}
       autoComplete="off"

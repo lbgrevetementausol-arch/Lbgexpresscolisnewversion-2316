@@ -211,6 +211,12 @@ function Index() {
                 en: "Parcels and moving across Greater Paris, shipping to Benin, Togo and Mali. Price in 30 seconds, pickup at your door, invoice with VAT, online tracking without an account.",
               })}
             </p>
+            <p className="mt-4 max-w-xl text-sm leading-relaxed text-primary">
+              {t({
+                fr: "10 kg vers l'Afrique de l'Ouest : 94,99 € chez nous en aérien, contre 148,99 € en Colissimo International (tarif officiel La Poste – Zone C). Petits colis en France dès 8,99 €.",
+                en: "10 kg to West Africa: €94.99 with us by air, versus €148.99 with Colissimo International (official La Poste rate – Zone C). Small parcels in France from €8.99.",
+              })}
+            </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link

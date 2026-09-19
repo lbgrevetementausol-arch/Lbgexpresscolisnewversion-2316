@@ -15,6 +15,12 @@ import {
   type ZoneId,
 } from "../lib/pricing";
 import { getPricingConfig } from "../lib/settings";
+import {
+  COVOITURAGE_MAX_KG,
+  devisDetaille,
+  PAYS_INTERNATIONAL,
+  type TypeService,
+} from "../../web/lib/pricing-strategique";
 import { mailQuoteOps, mailQuoteReceipt } from "../services/email";
 
 const zoneEnum = z.enum(Object.keys(ZONES) as [ZoneId, ...ZoneId[]]);
@@ -54,6 +60,34 @@ const quoteInput = priceInput.extend({
   message: z.string().max(2000).optional(),
   locale: z.enum(["fr", "en"]).default("fr"),
 });
+
+/** Entrée des 3 formulaires spécialisés (moteur « tarif stratégique »). */
+const strategiqueInput = z.object({
+  typeService: z.enum(["covoiturage", "international", "demenagement"]),
+  fromAddress: z.string().min(3).max(400),
+  toAddress: z.string().min(3).max(400),
+  distanceKm: z.number().min(0).max(20000).optional(),
+  weightKg: z.number().min(0).max(1000).optional(),
+  gabarit: z.enum(["petit", "moyen", "grand"]).optional(),
+  pays: z.string().max(80).optional(),
+  modeTransport: z.enum(["avion", "maritime"]).optional(),
+  cartons: z.number().min(0).max(500).optional(),
+  volumeM3: z.number().min(0).max(500).optional(),
+  etagesSansAscenseur: z.number().min(0).max(30).optional(),
+  accesDifficile: z.boolean().optional(),
+  goodsDescription: z.string().max(1000).optional(),
+  customerName: z.string().min(2).max(120),
+  customerEmail: z.string().email(),
+  customerPhone: z.string().max(40).optional(),
+  message: z.string().max(2000).optional(),
+  locale: z.enum(["fr", "en"]).default("fr"),
+});
+
+const STRATEGIQUE_KIND: Record<TypeService, ShipmentKind> = {
+  covoiturage: "colis",
+  international: "international",
+  demenagement: "demenagement",
+};
 
 export const quotes = {
   /** Calculateur de prix instantané (public, sans enregistrement) */
@@ -197,6 +231,133 @@ export const quotes = {
       breakdown: price.breakdown,
       etaDays: price.etaDays,
       chargeableWeight: price.chargeableWeight,
+    };
+  }),
+
+  /**
+   * Création d'un devis issu des 3 formulaires spécialisés (covoiturage / international /
+   * déménagement). Le prix est recalculé ici avec le moteur « tarif stratégique » : le
+   * navigateur ne fait qu'afficher, le serveur reste seul juge du montant facturé.
+   */
+  createStrategique: base.input(strategiqueInput).handler(async ({ input }) => {
+    if (input.typeService === "covoiturage" && (input.weightKg ?? 0) > COVOITURAGE_MAX_KG) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: `Le covoiturage de colis s'arrête à ${COVOITURAGE_MAX_KG} kg. Au-delà, demandez un devis sur mesure.`,
+      });
+    }
+
+    const price = devisDetaille(input.typeService, {
+      distance: input.distanceKm,
+      poids: input.weightKg,
+      modeTransport: input.modeTransport,
+      nombreCartons: input.cartons,
+      volumeM3: input.volumeM3,
+      etagesSansAscenseur: input.etagesSansAscenseur,
+      accesDifficile: input.accesDifficile,
+    });
+
+    const kind = STRATEGIQUE_KIND[input.typeService];
+    const zone = input.typeService === "international" ? "afrique" : "france";
+    const ref = generateRef(input.typeService === "demenagement" ? "DEM" : "DEV");
+    const trackingNumber = generateTrackingNumber();
+    const pays = input.pays
+      ? (PAYS_INTERNATIONAL.find((p) => p.id === input.pays)?.label ?? input.pays)
+      : undefined;
+    const details = [
+      input.goodsDescription,
+      pays ? `Destination : ${pays}` : undefined,
+      input.modeTransport ? `Mode : ${input.modeTransport === "avion" ? "aérien cargo / GP" : "maritime groupage"}` : undefined,
+      input.gabarit ? `Gabarit : ${input.gabarit}` : undefined,
+      input.distanceKm ? `Distance estimée : ${Math.round(input.distanceKm)} km` : undefined,
+      input.accesDifficile ? "Accès difficile / portage long signalé" : undefined,
+    ]
+      .filter(Boolean)
+      .join(" — ");
+
+    const [quote] = await db
+      .insert(schema.quotes)
+      .values({
+        ref,
+        kind,
+        service: "standard",
+        zone,
+        customerName: input.customerName,
+        customerEmail: input.customerEmail,
+        customerPhone: input.customerPhone,
+        fromAddress: input.fromAddress,
+        toAddress: input.toAddress,
+        weightKg: input.weightKg,
+        volumeM3: input.volumeM3,
+        pieces: Math.max(1, input.cartons ?? 1),
+        floors: input.etagesSansAscenseur ?? 0,
+        elevator: (input.etagesSansAscenseur ?? 0) === 0,
+        goodsDescription: details || undefined,
+        message: input.message,
+        priceCents: Math.round(price.total * 100),
+        breakdown: JSON.stringify(price.lines),
+        etaMin: price.etaDays[0],
+        etaMax: price.etaDays[1],
+        trackingNumber,
+        locale: input.locale,
+      })
+      .returning();
+
+    if (!quote) throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Devis non enregistré" });
+
+    const eta = new Date(Date.now() + price.etaDays[1] * 24 * 3600 * 1000);
+    await db.insert(schema.trackings).values({
+      trackingNumber,
+      quoteId: quote.id,
+      recipientName: input.customerName,
+      origin: input.fromAddress,
+      destination: input.toAddress,
+      status: "cree",
+      service: "standard",
+      weightKg: input.weightKg,
+      eta,
+      source: "site",
+    });
+    await db.insert(schema.trackingEvents).values({
+      trackingNumber,
+      status: "cree",
+      labelFr: "Devis enregistré — expédition créée",
+      labelEn: "Quote saved — shipment created",
+      location: input.fromAddress,
+    });
+
+    const priceCents = Math.round(price.total * 100);
+    await mailQuoteReceipt({
+      to: input.customerEmail,
+      name: input.customerName,
+      ref: quote.ref,
+      trackingNumber,
+      priceCents,
+      from: input.fromAddress,
+      to_: input.toAddress,
+      etaMin: price.etaDays[0],
+      etaMax: price.etaDays[1],
+    });
+    await mailQuoteOps({
+      ref: quote.ref,
+      kind,
+      zone,
+      service: "standard",
+      name: input.customerName,
+      email: input.customerEmail,
+      phone: input.customerPhone,
+      from: input.fromAddress,
+      to_: input.toAddress,
+      priceCents,
+      trackingNumber,
+      message: [details, input.message].filter(Boolean).join(" | ") || undefined,
+    });
+
+    return {
+      ref: quote.ref,
+      trackingNumber,
+      total: price.total,
+      breakdown: price.lines,
+      etaDays: price.etaDays,
     };
   }),
 

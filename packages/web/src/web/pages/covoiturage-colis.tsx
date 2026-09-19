@@ -2,7 +2,7 @@ import { BadgeCheck, HandCoins, Leaf, Route, ShieldCheck, Truck } from "lucide-r
 import { useI18n } from "../lib/i18n";
 import { PageHero } from "../components/site/layout";
 import { Card, Section, SectionHead } from "../components/site/section";
-import { QuoteForm } from "../components/site/quote-form";
+import { FormCovoiturage } from "../components/site/form-covoiturage";
 import { Reveal } from "../components/site/reveal";
 import { useSeo } from "../lib/seo";
 import { SEO_ROUTES } from "../lib/seo-routes";
@@ -123,12 +123,12 @@ export default function CovoiturageColisPage() {
           eyebrow={t({ fr: "Votre envoi", en: "Your shipment" })}
           title={t({ fr: "Calculez votre trajet en 60 secondes", en: "Price your route in 60 seconds" })}
           lead={t({
-            fr: "Le prix se met à jour en direct pendant que vous remplissez. Vous validez, nous plaçons le colis sur la prochaine tournée compatible.",
-            en: "The price updates live as you fill in the form. You confirm, we place the parcel on the next matching run.",
+            fr: "Vos petits colis dès 8,99 € sur les trajets courts. Renseignez les deux villes et le gabarit, lancez le calcul : le prix affiché est ferme, c'est celui que vous payez.",
+            en: "Small parcels from €8.99 on short routes. Enter both cities and the size, run the calculation: the price shown is firm, and it is the one you pay.",
           })}
         />
         <div className="mt-10">
-          <QuoteForm variant="colis" />
+          <FormCovoiturage />
         </div>
       </Section>
 

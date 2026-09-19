@@ -2,7 +2,7 @@ import { FileCheck2, Globe2, Plane, Ship } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 import { PageHero } from "../components/site/layout";
 import { Card, Section, SectionHead } from "../components/site/section";
-import { QuoteForm } from "../components/site/quote-form";
+import { FormInternational } from "../components/site/form-international";
 import { Reveal } from "../components/site/reveal";
 import { useSeo } from "../lib/seo";
 import { SEO_ROUTES } from "../lib/seo-routes";
@@ -64,7 +64,23 @@ export default function InternationalPage() {
       />
 
       <Section>
-        <QuoteForm variant="international" />
+        <Card className="mx-auto max-w-3xl border-primary/25 bg-primary/5">
+          <p className="text-sm leading-relaxed text-fg sm:text-base">
+            {t({
+              fr: "Pour un colis de 10 kg vers l'Afrique de l'Ouest, l'envoi classique par Colissimo International vous coûtera 148,99 € (Tarif officiel La Poste - Zone C), tandis que notre solution de fret / covoiturage vous permet de diviser ce coût par deux.",
+              en: "For a 10 kg parcel to West Africa, a standard Colissimo International shipment costs €148.99 (official La Poste rate - Zone C), while our freight / shared-load solution lets you halve that cost.",
+            })}
+          </p>
+          <p className="mt-3 text-sm text-muted">
+            {t({
+              fr: "Notre tarif pour ces 10 kg en aérien : 94,99 €, dédouanement à l'agence locale inclus.",
+              en: "Our price for those 10 kg by air: €94.99, local agency clearance included.",
+            })}
+          </p>
+        </Card>
+        <div className="mt-10">
+          <FormInternational />
+        </div>
       </Section>
 
       <Section className="border-t border-border bg-surface/40">

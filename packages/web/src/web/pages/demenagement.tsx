@@ -2,7 +2,7 @@ import { Boxes, Sofa, Users, Wrench } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 import { PageHero } from "../components/site/layout";
 import { Card, Section, SectionHead } from "../components/site/section";
-import { QuoteForm } from "../components/site/quote-form";
+import { FormDemenagement } from "../components/site/form-demenagement";
 import { Reveal } from "../components/site/reveal";
 import { useSeo } from "../lib/seo";
 import { SEO_ROUTES } from "../lib/seo-routes";
@@ -64,7 +64,7 @@ export default function DemenagementPage() {
       />
 
       <Section>
-        <QuoteForm variant="demenagement" />
+        <FormDemenagement />
       </Section>
 
       <Section className="border-t border-border bg-surface/40">

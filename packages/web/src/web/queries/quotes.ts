@@ -25,6 +25,11 @@ export function useCreateQuote() {
   return useMutation(orpc.quotes.create.mutationOptions());
 }
 
+/** Formulaires specialises (covoiturage / international / demenagement) */
+export function useCreateStrategicQuote() {
+  return useMutation(orpc.quotes.createStrategique.mutationOptions());
+}
+
 export function useQuote(ref: string) {
   return useQuery(
     orpc.quotes.get.queryOptions({ input: { ref }, enabled: ref.length > 3, retry: false }),
