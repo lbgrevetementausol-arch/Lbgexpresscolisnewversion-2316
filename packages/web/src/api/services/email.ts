@@ -484,3 +484,137 @@ export async function mailJobAssigned(args: {
   );
   return sendEmail({ to: args.to, subject: `Course ${args.trackingNumber} confirmée`, html });
 }
+
+/* ------------------------------------------------------------------ */
+/*                  Relances de panier abandonné                       */
+/* ------------------------------------------------------------------ */
+
+export interface AbandonedCartArgs {
+  to: string;
+  firstName?: string | null;
+  name: string;
+  ref: string;
+  orderNumber?: string | null;
+  priceCents: number;
+  from: string;
+  to_: string;
+  weightKg?: number | null;
+  volumeM3?: number | null;
+  pieces?: number | null;
+  serviceLabel?: string | null;
+  /** 1 = première relance, 2 = seconde relance. */
+  step: 1 | 2;
+}
+
+/** Récapitulatif commun : villes, poids/volume, montant. */
+function cartRecap(args: AbandonedCartArgs) {
+  return table(
+    row("Numéro de commande", args.orderNumber ?? args.ref) +
+      row("Prestation", args.serviceLabel) +
+      row("Départ", args.from) +
+      row("Destination", args.to_) +
+      row("Poids", args.weightKg ? `${args.weightKg} kg` : null) +
+      row("Volume", args.volumeM3 ? `${args.volumeM3} m³` : null) +
+      row("Colis", args.pieces && args.pieces > 1 ? `${args.pieces} colis` : null) +
+      row("Montant HT", euro(args.priceCents)) +
+      row("Montant TTC (TVA 20 %)", euro(Math.round(args.priceCents * 1.2))),
+  );
+}
+
+/**
+ * 14. Relance panier abandonné — petit colis / covoiturage.
+ * Rappel simple du devis et bouton de paiement, sans réduction.
+ */
+export async function mailAbandonedCartColis(args: AbandonedCartArgs) {
+  const prenom = args.firstName?.trim() || args.name;
+  const numero = args.orderNumber ?? args.ref;
+  const intro =
+    args.step === 1
+      ? `<p>Vous avez préparé l'envoi ci-dessous sur notre site, mais le règlement n'a pas été finalisé. Votre commande est conservée : il suffit d'un clic pour la valider.</p>`
+      : `<p>Petit rappel : votre envoi est toujours en attente de règlement. Dès que le paiement est reçu, nous planifions l'enlèvement et vous recevez votre numéro de suivi.</p>`;
+  const html = layout(
+    `Votre colis n° ${numero} est prêt à partir`,
+    `<p>Bonjour ${esc(prenom)},</p>
+     ${intro}
+     ${cartRecap(args)}
+     <p>Le trajet est mutualisé avec un transporteur professionnel déjà sur la route : vous ne payez que la place que votre colis occupe.</p>
+     <p>Une question avant de valider, ou un détail à corriger ? Répondez simplement à cet e-mail ou appelez-nous au ${esc(ISSUER.phone)} en rappelant le numéro <strong>${esc(numero)}</strong>.</p>
+     <p>À très vite,<br />L'équipe LBG Express Colis</p>`,
+    { label: "Finaliser ma commande", href: `${SITE}/paiement/${encodeURIComponent(args.ref)}` },
+  );
+  return sendEmail({
+    to: args.to,
+    subject: "Votre colis est prêt à partir ! Finalisez votre commande 📦",
+    html,
+  });
+}
+
+/** Nombre de jours pendant lesquels le tarif fret est garanti. */
+export const FREIGHT_PRICE_LOCK_DAYS = 7;
+
+/**
+ * 15. Relance panier abandonné — gros volume / fret international / déménagement.
+ * Met en avant le tarif bloqué et garanti 7 jours.
+ */
+export async function mailAbandonedCartFret(args: AbandonedCartArgs) {
+  const prenom = args.firstName?.trim() || args.name;
+  const numero = args.orderNumber ?? args.ref;
+  const intro =
+    args.step === 1
+      ? `<p>Merci d'avoir demandé une étude tarifaire. Votre devis est établi et nous le maintenons tel quel : <strong>le prix ci-dessous est bloqué et garanti pendant ${FREIGHT_PRICE_LOCK_DAYS} jours</strong>, le temps que vous compariez sereinement.</p>`
+      : `<p>Votre devis reste disponible, et <strong>le tarif est toujours bloqué et garanti pendant ${FREIGHT_PRICE_LOCK_DAYS} jours</strong> à compter de son établissement. Passé ce délai, il sera recalculé selon les conditions et la disponibilité du moment.</p>`;
+  const html = layout(
+    `Votre devis de fret n° ${numero} — tarif garanti ${FREIGHT_PRICE_LOCK_DAYS} jours`,
+    `<p>Bonjour ${esc(prenom)},</p>
+     ${intro}
+     ${cartRecap(args)}
+     <p>Sur ce type de volume, chaque dossier est suivi par un interlocuteur dédié : regroupement, emballage, formalités et créneau d'enlèvement sont calés avec vous avant le départ.</p>
+     <p>Vous préférez en parler de vive voix ou ajuster le volume déclaré ? Répondez à cet e-mail ou appelez le ${esc(ISSUER.phone)} avec le numéro <strong>${esc(numero)}</strong> : nous adaptons le devis sans repartir de zéro.</p>
+     <p>Bien cordialement,<br />L'équipe LBG Express Colis</p>`,
+    { label: "Valider mon devis", href: `${SITE}/paiement/${encodeURIComponent(args.ref)}` },
+  );
+  return sendEmail({
+    to: args.to,
+    subject: `LBG EXPRESS – Votre devis de fret personnalisé (Tarif garanti ${FREIGHT_PRICE_LOCK_DAYS} jours) 🚢`,
+    html,
+  });
+}
+
+/** 16. Alerte interne : gros volume de fret abandonné, à rappeler. */
+export async function mailAbandonOps(args: {
+  ref: string;
+  orderNumber?: string | null;
+  kindLabel: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone?: string | null;
+  priceCents: number;
+  from: string;
+  to_: string;
+  weightKg?: number | null;
+  volumeM3?: number | null;
+  createdAt: Date;
+}) {
+  const numero = args.orderNumber ?? args.ref;
+  const html = layout(
+    `À rappeler — fret abandonné n° ${numero}`,
+    `<p>Un devis de gros volume n'a pas été réglé. Un appel commercial peut débloquer le dossier.</p>
+     ${table(
+       row("Numéro", numero) +
+         row("Référence", args.ref) +
+         row("Type", args.kindLabel) +
+         row("Client", args.customerName) +
+         row("E-mail", args.customerEmail) +
+         row("Téléphone", args.customerPhone) +
+         row("Départ", args.from) +
+         row("Destination", args.to_) +
+         row("Poids", args.weightKg ? `${args.weightKg} kg` : null) +
+         row("Volume", args.volumeM3 ? `${args.volumeM3} m³` : null) +
+         row("Montant HT", euro(args.priceCents)) +
+         row("Devis créé le", args.createdAt.toLocaleString("fr-FR")),
+     )}
+     <p>Le client a reçu sa relance automatique avec le tarif garanti ${FREIGHT_PRICE_LOCK_DAYS} jours.</p>`,
+    { label: "Ouvrir le back-office", href: `${SITE}/admin` },
+  );
+  return sendEmail({ to: OPS, subject: `Fret abandonné n° ${numero} — ${euro(args.priceCents)} — à rappeler`, html });
+}

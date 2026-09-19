@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { NewsletterInline } from "../components/site/newsletter-inline";
 import { Check, Loader2 } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 import { money } from "../lib/format";
@@ -242,6 +243,7 @@ export default function TarifsPage() {
       </Section>
 
       <GuidesSection guides={GUIDES_COLIS} />
+    <NewsletterInline source="tarifs" />
     </>
   );
 }

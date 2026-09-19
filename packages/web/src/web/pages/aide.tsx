@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { NewsletterInline } from "../components/site/newsletter-inline";
 import { Link } from "wouter";
 import { CheckCircle2, Clock, Loader2, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import { useI18n } from "../lib/i18n";
@@ -253,6 +254,7 @@ export default function AidePage() {
           </div>
         </div>
       </Section>
+    <NewsletterInline source="aide" />
     </>
   );
 }

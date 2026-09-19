@@ -44,6 +44,12 @@ export const quotes = sqliteTable("quotes", {
   decisionReason: text("decision_reason"),
   decidedAt: integer("decided_at", { mode: "timestamp" }),
   locale: text("locale").notNull().default("fr"),
+  /** Relance panier abandonné n°1 : date d'envoi (vide = pas encore relancé). */
+  reminder1SentAt: integer("reminder1_sent_at", { mode: "timestamp" }),
+  /** Relance panier abandonné n°2 : date d'envoi. */
+  reminder2SentAt: integer("reminder2_sent_at", { mode: "timestamp" }),
+  /** Alerte commerciale interne envoyée pour un gros volume abandonné. */
+  opsAbandonNotifiedAt: integer("ops_abandon_notified_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),

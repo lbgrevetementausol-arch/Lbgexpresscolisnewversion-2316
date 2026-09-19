@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { NewsletterInline } from "../components/site/newsletter-inline";
 import {
   ArrowRight,
   Boxes,
@@ -580,6 +581,7 @@ function Index() {
           </div>
         </div>
       </section>
+    <NewsletterInline source="accueil" />
     </>
   );
 }

@@ -11,6 +11,7 @@ import { verifyUnsubscribe } from "./lib/unsubscribe-token";
 import { db } from "./database";
 import * as schema from "./database/schema";
 import { eq } from "drizzle-orm";
+import { runAbandonedCarts } from "./services/abandoned-carts";
 import { runReviewRequests } from "./services/review-requests";
 import { auth as betterAuth } from "./auth";
 import { MAX_DOC_BYTES, contentTypeFor, docPath, saveDoc } from "./lib/driver-docs";
@@ -145,6 +146,20 @@ app.post("/api/cron/review-requests", async (c) => {
   const dryRun = c.req.query("dry") === "1";
   try {
     const result = await runReviewRequests({ dryRun });
+    return c.json({ ok: true, dryRun, ...result }, 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "erreur inconnue";
+    return c.json({ ok: false, error: message }, 500);
+  }
+});
+
+app.post("/api/cron/abandoned-carts", async (c) => {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return c.json({ ok: false, error: "CRON_SECRET non configuré" }, 503);
+  if (c.req.header("x-lbg-cron-key") !== secret) return c.json({ ok: false, error: "clé invalide" }, 401);
+  const dryRun = c.req.query("dry") === "1";
+  try {
+    const result = await runAbandonedCarts({ dryRun });
     return c.json({ ok: true, dryRun, ...result }, 200);
   } catch (err) {
     const message = err instanceof Error ? err.message : "erreur inconnue";
