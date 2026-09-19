@@ -61,6 +61,20 @@ export const SEO_ROUTES: Record<string, RouteSeo> = {
     image: "/images/livraison-2.jpg",
     keywords: ["suivre un colis", "suivi colis", "numéro de suivi", "où est mon colis"],
   },
+  "/covoiturage-colis": {
+    title: "Covoiturage de colis en France — envoi mutualisé, prix ferme | LBG Express Colis",
+    description:
+      "Le covoiturage de colis : votre colis voyage sur une tournée déjà prévue par un transporteur professionnel. Prix ferme en 60 secondes, remise en main propre, marchandise couverte.",
+    path: "/covoiturage-colis",
+    image: "/images/livraison.jpg",
+    keywords: [
+      "covoiturage de colis",
+      "covoiturage colis france",
+      "envoyer un colis pas cher",
+      "transport de colis mutualisé",
+      "livraison de colis entre villes",
+    ],
+  },
   "/demenagement": {
     title: "Entreprise de déménagement — devis en ligne, tarif au m³ | LBG Express Colis",
     description:

@@ -40,7 +40,7 @@ const SERVICES = [
     en: "Parcel delivery",
     descFr: "Enlèvement à domicile, dépôt relais ou point à point, partout en France, en 24 à 72 h.",
     descEn: "Home pickup, drop-off or point-to-point delivery across France in 24 to 72 hours.",
-    href: "/devis",
+    href: "/covoiturage-colis",
   },
   {
     icon: Zap,

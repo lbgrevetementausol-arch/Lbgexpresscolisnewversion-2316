@@ -25,9 +25,10 @@ const COLUMNS = [
     title: { fr: "Services", en: "Services" },
     links: [
       { href: "/services", fr: "Tous nos services", en: "All services" },
-      { href: "/devis", fr: "Envoyer un colis", en: "Send a parcel" },
-      { href: "/demenagement", fr: "Déménagement", en: "Moving" },
-      { href: "/commande-internationale", fr: "Commande internationale", en: "International order" },
+      { href: "/covoiturage-colis", fr: "Covoiturage de colis", en: "Parcel ride-sharing" },
+      { href: "/demenagement", fr: "Déménagement en France", en: "Moving in France" },
+      { href: "/commande-internationale", fr: "International (Bénin, Togo, Mali)", en: "International (Benin, Togo, Mali)" },
+      { href: "/devis", fr: "Devis en ligne", en: "Online quote" },
       { href: "/tarifs", fr: "Tarifs", en: "Pricing" },
     ],
   },

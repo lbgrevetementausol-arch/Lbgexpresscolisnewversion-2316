@@ -5,6 +5,7 @@ import { AgentFeedback } from "@runablehq/website-runtime";
 import Index from "./pages/index";
 import SuiviPage from "./pages/suivi";
 import DevisPage from "./pages/devis";
+import CovoiturageColisPage from "./pages/covoiturage-colis";
 import DemenagementPage from "./pages/demenagement";
 import InternationalPage from "./pages/international";
 import ServicesPage from "./pages/services";
@@ -34,6 +35,7 @@ function App() {
           <Route path="/" component={Index} />
           <Route path="/suivi" component={SuiviPage} />
           <Route path="/devis" component={DevisPage} />
+          <Route path="/covoiturage-colis" component={CovoiturageColisPage} />
           <Route path="/demenagement" component={DemenagementPage} />
           <Route path="/commande-internationale" component={InternationalPage} />
           <Route path="/services" component={ServicesPage} />

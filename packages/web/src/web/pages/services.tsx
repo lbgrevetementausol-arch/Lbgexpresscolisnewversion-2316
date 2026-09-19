@@ -22,8 +22,8 @@ const SERVICES = [
   {
     icon: Package,
     image: "/images/livraison.jpg",
-    fr: "Livraison de colis",
-    en: "Parcel delivery",
+    fr: "Covoiturage de colis en France",
+    en: "Parcel ride-sharing in France",
     descFr:
       "Enlèvement à domicile ou en entreprise, livraison point à point partout en France métropolitaine en 24 à 72 h. Preuve de livraison photo et signature.",
     descEn:
@@ -33,7 +33,7 @@ const SERVICES = [
       { fr: "Créneau confirmé par WhatsApp", en: "Slot confirmed by WhatsApp" },
       { fr: "Suivi TRK et notifications", en: "TRK tracking and notifications" },
     ],
-    href: "/devis",
+    href: "/covoiturage-colis",
   },
   {
     icon: Zap,
