@@ -109,24 +109,31 @@ const table = (rows: string) => `<table role="presentation" style="font-size:14p
 /*                          E-mails métier                             */
 /* ------------------------------------------------------------------ */
 
-/** 1. Accusé de réception d'une demande de devis, au client. */
+/** 1. E-mail de remerciement et de confirmation de commande, au client. */
 export async function mailQuoteReceipt(args: {
   to: string;
   name: string;
+  firstName?: string | null;
   ref: string;
+  orderNumber?: string | null;
   trackingNumber: string;
   priceCents: number;
   from: string;
   to_: string;
   etaMin: number;
   etaMax: number;
+  serviceLabel?: string | null;
 }) {
+  const prenom = args.firstName?.trim() || args.name;
+  const numero = args.orderNumber ?? args.ref;
   const html = layout(
-    `Votre devis ${args.ref} est enregistré`,
-    `<p>Bonjour ${esc(args.name)},</p>
-     <p>Merci pour votre demande. Voici le récapitulatif de votre estimation :</p>
+    args.orderNumber ? `Merci ${prenom} — commande n° ${args.orderNumber} confirmée` : `Votre devis ${args.ref} est enregistré`,
+    `<p>Bonjour ${esc(prenom)},</p>
+     <p>Merci de votre confiance. Votre commande est bien enregistrée dans notre système : voici le récapitulatif à conserver.</p>
      ${table(
-       row("Référence", args.ref) +
+       row("Numéro de commande", numero) +
+         row("Référence dossier", args.ref) +
+         row("Prestation", args.serviceLabel) +
          row("Enlèvement", args.from) +
          row("Livraison", args.to_) +
          row("Délai estimé", `${args.etaMin} à ${args.etaMax} jours ouvrés`) +
@@ -134,19 +141,30 @@ export async function mailQuoteReceipt(args: {
          row("Montant TTC (TVA 20 %)", euro(Math.round(args.priceCents * 1.2))) +
          row("N° de suivi", args.trackingNumber),
      )}
-     <p>Notre équipe valide la faisabilité et vous rappelle sous 2 heures ouvrées. Vous pouvez aussi nous joindre directement au ${esc(ISSUER.phone)} ou sur WhatsApp.</p>`,
-    { label: "Suivre ma demande", href: `${SITE}/suivi?n=${encodeURIComponent(args.trackingNumber)}` },
+     <p><strong>La suite :</strong> notre équipe vérifie la faisabilité de l'enlèvement et vous rappelle sous 2 heures ouvrées au numéro que vous nous avez laissé. Le règlement se fait depuis votre espace de paiement sécurisé, et l'enlèvement est planifié dès confirmation.</p>
+     <p>Pour toute question, rappelez simplement votre numéro de commande <strong>${esc(numero)}</strong> — par téléphone au ${esc(ISSUER.phone)}, sur WhatsApp ou par retour d'e-mail.</p>
+     <p>À très vite,<br />L'équipe LBG Express Colis</p>`,
+    { label: `Voir ma commande n° ${numero}`, href: `${SITE}/paiement/${encodeURIComponent(args.ref)}` },
   );
-  return sendEmail({ to: args.to, subject: `Devis ${args.ref} — LBG Express Colis`, html });
+  return sendEmail({
+    to: args.to,
+    subject: args.orderNumber
+      ? `Commande n° ${args.orderNumber} confirmée — merci ! — LBG Express Colis`
+      : `Devis ${args.ref} — LBG Express Colis`,
+    html,
+  });
 }
 
-/** 2. Notification interne : nouveau devis. */
+/** 2. Notification interne : nouvelle commande reçue. */
 export async function mailQuoteOps(args: {
   ref: string;
+  orderNumber?: string | null;
   kind: string;
   zone: string;
   service: string;
   name: string;
+  firstName?: string | null;
+  lastName?: string | null;
   email: string;
   phone?: string | null;
   from: string;
@@ -155,21 +173,34 @@ export async function mailQuoteOps(args: {
   trackingNumber: string;
   message?: string | null;
 }) {
+  const titre = args.orderNumber
+    ? `Nouvelle commande n° ${args.orderNumber}`
+    : `Nouveau devis ${args.ref}`;
   const html = layout(
-    `Nouveau devis ${args.ref}`,
-    table(
-      row("Client", args.name) +
-        row("E-mail", args.email) +
-        row("Téléphone", args.phone) +
-        row("Type", `${args.kind} · ${args.zone} · ${args.service}`) +
-        row("Enlèvement", args.from) +
-        row("Livraison", args.to_) +
-        row("Montant HT", euro(args.priceCents)) +
-        row("Suivi", args.trackingNumber),
-    ) + (args.message ? `<p style="margin-top:14px"><em>${esc(args.message)}</em></p>` : ""),
+    titre,
+    `<p>Une nouvelle commande vient d'arriver sur le site.</p>` +
+      table(
+        row("N° de commande", args.orderNumber) +
+          row("Référence dossier", args.ref) +
+          row("Nom", args.lastName ?? args.name) +
+          row("Prénom", args.firstName) +
+          row("E-mail", args.email) +
+          row("Téléphone", args.phone) +
+          row("Type", `${args.kind} · ${args.zone} · ${args.service}`) +
+          row("Enlèvement", args.from) +
+          row("Livraison", args.to_) +
+          row("Montant HT", euro(args.priceCents)) +
+          row("Suivi", args.trackingNumber),
+      ) +
+      (args.message ? `<p style="margin-top:14px"><em>${esc(args.message)}</em></p>` : ""),
     { label: "Ouvrir le back-office", href: `${SITE}/admin` },
   );
-  return sendEmail({ to: OPS, subject: `[Devis] ${args.ref} — ${args.name} — ${euro(args.priceCents)} HT`, html, replyTo: args.email });
+  return sendEmail({
+    to: OPS,
+    subject: `[Commande${args.orderNumber ? ` n° ${args.orderNumber}` : ""}] ${args.name} — ${euro(args.priceCents)} HT — ${args.ref}`,
+    html,
+    replyTo: args.email,
+  });
 }
 
 /** 3. Notification interne : message de contact. */

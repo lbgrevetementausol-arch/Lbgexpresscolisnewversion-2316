@@ -117,20 +117,24 @@ export function DistanceField({
 
 /** Coordonnées client — affichées une fois le prix calculé. */
 export function ContactFields({
-  name,
+  firstName,
+  lastName,
   email,
   phone,
   message,
-  onName,
+  onFirstName,
+  onLastName,
   onEmail,
   onPhone,
   onMessage,
 }: {
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   phone: string;
   message: string;
-  onName: (v: string) => void;
+  onFirstName: (v: string) => void;
+  onLastName: (v: string) => void;
   onEmail: (v: string) => void;
   onPhone: (v: string) => void;
   onMessage: (v: string) => void;
@@ -138,14 +142,23 @@ export function ContactFields({
   const { t } = useI18n();
   return (
     <div className="mt-5 grid gap-4 sm:grid-cols-2">
-      <Field label={t({ fr: "Nom et prénom", en: "Full name" })}>
-        <Input required value={name} onChange={(e) => onName(e.target.value)} />
+      <Field label={t({ fr: "Prénom *", en: "First name *" })}>
+        <Input required value={firstName} onChange={(e) => onFirstName(e.target.value)} />
       </Field>
-      <Field label="Email">
+      <Field label={t({ fr: "Nom *", en: "Last name *" })}>
+        <Input required value={lastName} onChange={(e) => onLastName(e.target.value)} />
+      </Field>
+      <Field label={t({ fr: "Adresse e-mail *", en: "Email address *" })}>
         <Input required type="email" value={email} onChange={(e) => onEmail(e.target.value)} />
       </Field>
-      <Field label={t({ fr: "Téléphone", en: "Phone" })}>
-        <Input value={phone} onChange={(e) => onPhone(e.target.value)} placeholder="+33 6 …" />
+      <Field label={t({ fr: "Téléphone joignable *", en: "Reachable phone *" })}>
+        <Input
+          required
+          type="tel"
+          value={phone}
+          onChange={(e) => onPhone(e.target.value)}
+          placeholder="+33 6 …"
+        />
       </Field>
       <Field
         className="sm:col-span-2"

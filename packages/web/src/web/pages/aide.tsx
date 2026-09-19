@@ -25,7 +25,8 @@ export default function AidePage() {
   const send = useSendContact();
   useSeo(SEO_ROUTES["/aide"]);
 
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [subject, setSubject] = useState(SUBJECTS[0]!.fr);
@@ -34,7 +35,13 @@ export default function AidePage() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     send.mutate(
-      { name, email, phone: phone || undefined, subject, message },
+      {
+        name: `${firstName} ${lastName}`.replace(/\s+/g, " ").trim(),
+        email,
+        phone,
+        subject,
+        message,
+      },
       { onSuccess: () => trackContact({ content_name: subject }) },
     );
   };
@@ -79,14 +86,33 @@ export default function AidePage() {
               </div>
             ) : (
               <form onSubmit={submit} className="mt-6 grid gap-4 sm:grid-cols-2">
-                <Field label={t({ fr: "Nom et prénom", en: "Full name" })}>
-                  <Input required minLength={2} value={name} onChange={(e) => setName(e.target.value)} />
+                <Field label={t({ fr: "Prénom *", en: "First name *" })}>
+                  <Input
+                    required
+                    minLength={2}
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                  />
                 </Field>
-                <Field label="Email">
+                <Field label={t({ fr: "Nom *", en: "Last name *" })}>
+                  <Input
+                    required
+                    minLength={2}
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                  />
+                </Field>
+                <Field label={t({ fr: "Adresse e-mail *", en: "Email address *" })}>
                   <Input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
                 </Field>
-                <Field label={t({ fr: "Téléphone (optionnel)", en: "Phone (optional)" })}>
-                  <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+33 6 …" />
+                <Field label={t({ fr: "Téléphone joignable *", en: "Reachable phone *" })}>
+                  <Input
+                    required
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+33 6 …"
+                  />
                 </Field>
                 <Field label={t({ fr: "Sujet", en: "Subject" })}>
                   <Select value={subject} onChange={(e) => setSubject(e.target.value)}>

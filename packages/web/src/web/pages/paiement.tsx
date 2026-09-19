@@ -71,7 +71,11 @@ export default function PaiementPage() {
   return (
     <>
       <PageHero
-        eyebrow={t({ fr: `Devis ${q.ref}`, en: `Quote ${q.ref}` })}
+        eyebrow={
+          q.orderNumber
+            ? t({ fr: `Commande n° ${q.orderNumber}`, en: `Order no. ${q.orderNumber}` })
+            : t({ fr: `Devis ${q.ref}`, en: `Quote ${q.ref}` })
+        }
         title={
           paid
             ? t({ fr: "Commande enregistrée", en: "Order recorded" })
@@ -239,7 +243,21 @@ export default function PaiementPage() {
           {/* Récapitulatif */}
           <Card hover={false} className="lg:sticky lg:top-28">
             <h2 className="font-display text-lg font-bold">{t({ fr: "Récapitulatif", en: "Summary" })}</h2>
-            <p className="mt-1 font-mono text-xs text-primary">{q.ref}</p>
+            {q.orderNumber ? (
+              <div className="mt-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                  {t({ fr: "Votre numéro de commande", en: "Your order number" })}
+                </p>
+                <p className="font-display text-2xl font-extrabold text-primary">{q.orderNumber}</p>
+                <p className="mt-1 text-xs text-muted">
+                  {t({
+                    fr: "Gardez ce numéro : il suffit de le donner par téléphone ou par e-mail.",
+                    en: "Keep this number: just quote it by phone or email.",
+                  })}
+                </p>
+              </div>
+            ) : null}
+            <p className="mt-2 font-mono text-xs text-muted">{q.ref}</p>
 
             <ul className="mt-5 grid gap-2 text-sm">
               {q.breakdown.map((line) => (

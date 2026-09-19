@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../database";
 import * as schema from "../database/schema";
@@ -276,6 +276,30 @@ export const admin = {
       await log(context.user, "lead.handled", String(input.id));
       return { ok: true };
     }),
+
+  /* ---------------- Notifications back-office ---------------- */
+
+  /** Liste des notifications « nouvelle commande reçue », les plus récentes d'abord. */
+  notifications: adminOnly.handler(() =>
+    db.select().from(schema.notifications).orderBy(desc(schema.notifications.createdAt)).limit(100),
+  ),
+
+  /** Marque une notification comme lue (ou non lue). */
+  markNotificationRead: adminOnly
+    .input(z.object({ id: z.number(), read: z.boolean().default(true) }))
+    .handler(async ({ input }) => {
+      await db
+        .update(schema.notifications)
+        .set({ readAt: input.read ? new Date() : null })
+        .where(eq(schema.notifications.id, input.id));
+      return { ok: true };
+    }),
+
+  /** Marque toutes les notifications comme lues. */
+  markAllNotificationsRead: adminOnly.handler(async () => {
+    await db.update(schema.notifications).set({ readAt: new Date() }).where(isNull(schema.notifications.readAt));
+    return { ok: true };
+  }),
 
   audit: adminOnly.handler(() =>
     db.select().from(schema.auditLog).orderBy(desc(schema.auditLog.createdAt)).limit(200),

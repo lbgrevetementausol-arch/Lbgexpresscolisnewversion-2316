@@ -4,10 +4,14 @@ import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 export const quotes = sqliteTable("quotes", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   ref: text("ref").notNull().unique(),
+  /** Numéro de commande à 4 chiffres communiqué au client (1000 → 9999). */
+  orderNumber: text("order_number").unique(),
   kind: text("kind").notNull().default("colis"),
   service: text("service").notNull().default("standard"),
   zone: text("zone").notNull().default("france"),
   customerName: text("customer_name").notNull(),
+  customerFirstName: text("customer_first_name"),
+  customerLastName: text("customer_last_name"),
   customerEmail: text("customer_email").notNull(),
   customerPhone: text("customer_phone"),
   company: text("company"),
@@ -40,6 +44,25 @@ export const quotes = sqliteTable("quotes", {
   decisionReason: text("decision_reason"),
   decidedAt: integer("decided_at", { mode: "timestamp" }),
   locale: text("locale").notNull().default("fr"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+/** Notifications du back-office (nouvelle commande, paiement…) */
+export const notifications = sqliteTable("notifications", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  kind: text("kind").notNull().default("commande"),
+  title: text("title").notNull(),
+  body: text("body"),
+  /** Référence du devis/commande concerné, pour ouvrir la fiche depuis la notification. */
+  quoteRef: text("quote_ref"),
+  orderNumber: text("order_number"),
+  amountCents: integer("amount_cents"),
+  customerName: text("customer_name"),
+  customerEmail: text("customer_email"),
+  customerPhone: text("customer_phone"),
+  readAt: integer("read_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),

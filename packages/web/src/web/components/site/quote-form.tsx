@@ -61,7 +61,8 @@ export function QuoteForm({ variant }: { variant: QuoteVariant }) {
 
   const [fromAddress, setFromAddress] = useState("");
   const [toAddress, setToAddress] = useState("");
-  const [customerName, setCustomerName] = useState("");
+  const [customerFirstName, setCustomerFirstName] = useState("");
+  const [customerLastName, setCustomerLastName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [company, setCompany] = useState("");
@@ -105,9 +106,10 @@ export function QuoteForm({ variant }: { variant: QuoteVariant }) {
     createQuote.mutate(
       {
         ...estimateInput,
-        customerName,
+        customerFirstName,
+        customerLastName,
         customerEmail,
-        customerPhone: customerPhone || undefined,
+        customerPhone,
         company: company || undefined,
         fromAddress,
         toAddress,
@@ -370,14 +372,31 @@ export function QuoteForm({ variant }: { variant: QuoteVariant }) {
         <Card hover={false}>
           <h3 className="font-display text-lg font-bold">{t({ fr: "4. Vos coordonnées", en: "4. Your details" })}</h3>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            <Field label={t({ fr: "Nom et prénom", en: "Full name" })}>
-              <Input required value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+            <Field label={t({ fr: "Prénom *", en: "First name *" })}>
+              <Input
+                required
+                value={customerFirstName}
+                onChange={(e) => setCustomerFirstName(e.target.value)}
+              />
             </Field>
-            <Field label="Email">
+            <Field label={t({ fr: "Nom *", en: "Last name *" })}>
+              <Input
+                required
+                value={customerLastName}
+                onChange={(e) => setCustomerLastName(e.target.value)}
+              />
+            </Field>
+            <Field label={t({ fr: "Adresse e-mail *", en: "Email address *" })}>
               <Input required type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
             </Field>
-            <Field label={t({ fr: "Téléphone", en: "Phone" })}>
-              <Input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="+33 6 …" />
+            <Field label={t({ fr: "Téléphone joignable *", en: "Reachable phone *" })}>
+              <Input
+                required
+                type="tel"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                placeholder="+33 6 …"
+              />
             </Field>
             <Field label={t({ fr: "Société (optionnel)", en: "Company (optional)" })}>
               <Input value={company} onChange={(e) => setCompany(e.target.value)} />

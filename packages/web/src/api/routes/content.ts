@@ -11,9 +11,14 @@ export const content = {
   contact: base
     .input(
       z.object({
-        name: z.string().min(2).max(120),
-        email: z.string().email(),
-        phone: z.string().max(40).optional(),
+        name: z.string().trim().min(2).max(120),
+        email: z.string().trim().email(),
+        phone: z
+          .string()
+          .trim()
+          .min(8, "Téléphone joignable requis")
+          .max(40)
+          .regex(/^[+()0-9][0-9 ()./-]{6,}$/, "Numéro de téléphone invalide"),
         subject: z.string().min(2).max(160),
         message: z.string().min(5).max(4000),
       }),

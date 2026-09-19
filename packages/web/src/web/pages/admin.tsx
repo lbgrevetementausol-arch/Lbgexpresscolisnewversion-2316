@@ -10,6 +10,7 @@ import {
   Map,
   PackageSearch,
   Settings,
+  BellRing,
   ShoppingBag,
   Truck,
   Users,
@@ -21,6 +22,7 @@ import { PageHero } from "../components/site/layout";
 import { Section } from "../components/site/section";
 import { ProtectedRoute } from "../components/protected-route";
 import { DashboardPanel } from "../components/admin/dashboard-panel";
+import { NotificationsPanel } from "../components/admin/notifications-panel";
 import { OrdersPanel } from "../components/admin/orders-panel";
 import { InvoicesPanel } from "../components/admin/invoices-panel";
 import { UsersPanel } from "../components/admin/users-panel";
@@ -34,6 +36,7 @@ import { NewsletterPanel } from "../components/admin/newsletter-panel";
 
 const TABS = [
   { id: "tableau", fr: "Tableau de bord", en: "Dashboard", icon: BarChart3 },
+  { id: "notifications", fr: "Notifications", en: "Notifications", icon: BellRing },
   { id: "commandes", fr: "Commandes", en: "Orders", icon: ShoppingBag },
   { id: "factures", fr: "Factures", en: "Invoices", icon: FileText },
   { id: "suivis", fr: "Suivis", en: "Trackings", icon: PackageSearch },
@@ -109,6 +112,7 @@ function AdminShell() {
 
         <div className="mt-6">
           {tab === "tableau" ? <DashboardPanel /> : null}
+          {tab === "notifications" ? <NotificationsPanel /> : null}
           {tab === "commandes" ? <OrdersPanel /> : null}
           {tab === "factures" ? <InvoicesPanel /> : null}
           {tab === "suivis" ? <TrackingsPanel /> : null}

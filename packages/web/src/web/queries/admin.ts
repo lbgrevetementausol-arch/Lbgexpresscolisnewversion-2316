@@ -116,6 +116,28 @@ export function useAddTrackingEvent() {
   );
 }
 
+export function useAdminNotifications(enabled: boolean) {
+  return useQuery(orpc.admin.notifications.queryOptions({ enabled, refetchInterval: 10_000 }));
+}
+
+export function useMarkNotificationRead() {
+  const queryClient = useQueryClient();
+  return useMutation(
+    orpc.admin.markNotificationRead.mutationOptions({
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.admin.notifications.key() }),
+    }),
+  );
+}
+
+export function useMarkAllNotificationsRead() {
+  const queryClient = useQueryClient();
+  return useMutation(
+    orpc.admin.markAllNotificationsRead.mutationOptions({
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.admin.notifications.key() }),
+    }),
+  );
+}
+
 export function useMarkLeadHandled() {
   const queryClient = useQueryClient();
   return useMutation(

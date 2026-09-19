@@ -15,6 +15,7 @@ import {
   type ZoneId,
 } from "../lib/pricing";
 import { getPricingConfig } from "../lib/settings";
+import { nextOrderNumber } from "../lib/order-number";
 import {
   COVOITURAGE_MAX_KG,
   devisDetaille,
@@ -49,10 +50,52 @@ const priceInput = z.object({
   hoist: z.boolean().optional(),
 });
 
+/**
+ * Coordonnées exigées sur tous les formulaires : nom, prénom, e-mail et téléphone
+ * joignable. Aucune commande n'est enregistrée sans ces quatre informations.
+ */
+const contactShape = {
+  customerFirstName: z.string().trim().min(2, "Prénom requis").max(60),
+  customerLastName: z.string().trim().min(2, "Nom requis").max(60),
+  customerEmail: z.string().trim().email("E-mail invalide"),
+  customerPhone: z
+    .string()
+    .trim()
+    .min(8, "Téléphone joignable requis")
+    .max(40)
+    .regex(/^[+()0-9][0-9 ()./-]{6,}$/, "Numéro de téléphone invalide"),
+};
+
+const fullName = (input: { customerFirstName: string; customerLastName: string }) =>
+  `${input.customerFirstName} ${input.customerLastName}`.replace(/\s+/g, " ").trim();
+
+/** Notification back-office « nouvelle commande reçue ». */
+async function notifyNewOrder(args: {
+  orderNumber: string;
+  ref: string;
+  name: string;
+  email: string;
+  phone: string;
+  priceCents: number;
+  from: string;
+  to: string;
+  serviceLabel: string;
+}) {
+  await db.insert(schema.notifications).values({
+    kind: "commande",
+    title: `Nouvelle commande n° ${args.orderNumber}`,
+    body: `${args.name} — ${args.serviceLabel} — ${(args.priceCents / 100).toFixed(2).replace(".", ",")} € HT — ${args.from} → ${args.to}`,
+    quoteRef: args.ref,
+    orderNumber: args.orderNumber,
+    amountCents: args.priceCents,
+    customerName: args.name,
+    customerEmail: args.email,
+    customerPhone: args.phone,
+  });
+}
+
 const quoteInput = priceInput.extend({
-  customerName: z.string().min(2).max(120),
-  customerEmail: z.string().email(),
-  customerPhone: z.string().max(40).optional(),
+  ...contactShape,
   company: z.string().max(120).optional(),
   fromAddress: z.string().min(3).max(400),
   toAddress: z.string().min(3).max(400),
@@ -68,7 +111,7 @@ const strategiqueInput = z.object({
   toAddress: z.string().min(3).max(400),
   distanceKm: z.number().min(0).max(20000).optional(),
   weightKg: z.number().min(0).max(1000).optional(),
-  gabarit: z.enum(["petit", "moyen", "grand"]).optional(),
+  gabarit: z.enum(["petit", "moyen", "grand", "hors-norme"]).optional(),
   pays: z.string().max(80).optional(),
   modeTransport: z.enum(["avion", "maritime"]).optional(),
   cartons: z.number().min(0).max(500).optional(),
@@ -76,9 +119,7 @@ const strategiqueInput = z.object({
   etagesSansAscenseur: z.number().min(0).max(30).optional(),
   accesDifficile: z.boolean().optional(),
   goodsDescription: z.string().max(1000).optional(),
-  customerName: z.string().min(2).max(120),
-  customerEmail: z.string().email(),
-  customerPhone: z.string().max(40).optional(),
+  ...contactShape,
   message: z.string().max(2000).optional(),
   locale: z.enum(["fr", "en"]).default("fr"),
 });
@@ -87,6 +128,12 @@ const STRATEGIQUE_KIND: Record<TypeService, ShipmentKind> = {
   covoiturage: "colis",
   international: "international",
   demenagement: "demenagement",
+};
+
+const STRATEGIQUE_LABEL: Record<TypeService, string> = {
+  covoiturage: "Covoiturage de colis",
+  international: "Envoi international",
+  demenagement: "Déménagement",
 };
 
 export const quotes = {
@@ -136,15 +183,20 @@ export const quotes = {
     const price = computePrice(input, await getPricingConfig());
     const ref = generateRef(input.kind === "demenagement" ? "DEM" : "DEV");
     const trackingNumber = generateTrackingNumber();
+    const orderNumber = await nextOrderNumber();
+    const customerName = fullName(input);
 
     const [quote] = await db
       .insert(schema.quotes)
       .values({
         ref,
+        orderNumber,
         kind: input.kind,
         service: input.service,
         zone: input.zone,
-        customerName: input.customerName,
+        customerName,
+        customerFirstName: input.customerFirstName,
+        customerLastName: input.customerLastName,
         customerEmail: input.customerEmail,
         customerPhone: input.customerPhone,
         company: input.company,
@@ -180,7 +232,7 @@ export const quotes = {
     await db.insert(schema.trackings).values({
       trackingNumber,
       quoteId: quote.id,
-      recipientName: input.customerName,
+      recipientName: customerName,
       origin: input.fromAddress,
       destination: input.toAddress,
       status: "cree",
@@ -192,29 +244,47 @@ export const quotes = {
     await db.insert(schema.trackingEvents).values({
       trackingNumber,
       status: "cree",
-      labelFr: "Devis enregistré — expédition créée",
-      labelEn: "Quote saved — shipment created",
+      labelFr: `Commande n° ${orderNumber} enregistrée — expédition créée`,
+      labelEn: `Order no. ${orderNumber} recorded — shipment created`,
       location: input.fromAddress,
     });
 
     const priceCents = Math.round(price.total * 100);
+    const serviceLabel = `${SERVICES[input.service].label.fr} · ${ZONES[input.zone].label.fr}`;
+    await notifyNewOrder({
+      orderNumber,
+      ref: quote.ref,
+      name: customerName,
+      email: input.customerEmail,
+      phone: input.customerPhone,
+      priceCents,
+      from: input.fromAddress,
+      to: input.toAddress,
+      serviceLabel,
+    });
     await mailQuoteReceipt({
       to: input.customerEmail,
-      name: input.customerName,
+      name: customerName,
+      firstName: input.customerFirstName,
       ref: quote.ref,
+      orderNumber,
       trackingNumber,
       priceCents,
       from: input.fromAddress,
       to_: input.toAddress,
       etaMin: price.etaDays[0],
       etaMax: price.etaDays[1],
+      serviceLabel,
     });
     await mailQuoteOps({
       ref: quote.ref,
+      orderNumber,
       kind: input.kind,
       zone: input.zone,
       service: input.service,
-      name: input.customerName,
+      name: customerName,
+      firstName: input.customerFirstName,
+      lastName: input.customerLastName,
       email: input.customerEmail,
       phone: input.customerPhone,
       from: input.fromAddress,
@@ -226,6 +296,7 @@ export const quotes = {
 
     return {
       ref: quote.ref,
+      orderNumber,
       trackingNumber,
       total: price.total,
       breakdown: price.breakdown,
@@ -258,6 +329,8 @@ export const quotes = {
 
     const kind = STRATEGIQUE_KIND[input.typeService];
     const zone = input.typeService === "international" ? "afrique" : "france";
+    const orderNumber = await nextOrderNumber();
+    const customerName = fullName(input);
     const ref = generateRef(input.typeService === "demenagement" ? "DEM" : "DEV");
     const trackingNumber = generateTrackingNumber();
     const pays = input.pays
@@ -281,7 +354,10 @@ export const quotes = {
         kind,
         service: "standard",
         zone,
-        customerName: input.customerName,
+        orderNumber,
+        customerName,
+        customerFirstName: input.customerFirstName,
+        customerLastName: input.customerLastName,
         customerEmail: input.customerEmail,
         customerPhone: input.customerPhone,
         fromAddress: input.fromAddress,
@@ -308,7 +384,7 @@ export const quotes = {
     await db.insert(schema.trackings).values({
       trackingNumber,
       quoteId: quote.id,
-      recipientName: input.customerName,
+      recipientName: customerName,
       origin: input.fromAddress,
       destination: input.toAddress,
       status: "cree",
@@ -320,29 +396,47 @@ export const quotes = {
     await db.insert(schema.trackingEvents).values({
       trackingNumber,
       status: "cree",
-      labelFr: "Devis enregistré — expédition créée",
-      labelEn: "Quote saved — shipment created",
+      labelFr: `Commande n° ${orderNumber} enregistrée — expédition créée`,
+      labelEn: `Order no. ${orderNumber} recorded — shipment created`,
       location: input.fromAddress,
     });
 
     const priceCents = Math.round(price.total * 100);
+    const serviceLabel = STRATEGIQUE_LABEL[input.typeService];
+    await notifyNewOrder({
+      orderNumber,
+      ref: quote.ref,
+      name: customerName,
+      email: input.customerEmail,
+      phone: input.customerPhone,
+      priceCents,
+      from: input.fromAddress,
+      to: input.toAddress,
+      serviceLabel,
+    });
     await mailQuoteReceipt({
       to: input.customerEmail,
-      name: input.customerName,
+      name: customerName,
+      firstName: input.customerFirstName,
       ref: quote.ref,
+      orderNumber,
       trackingNumber,
       priceCents,
       from: input.fromAddress,
       to_: input.toAddress,
       etaMin: price.etaDays[0],
       etaMax: price.etaDays[1],
+      serviceLabel,
     });
     await mailQuoteOps({
       ref: quote.ref,
+      orderNumber,
       kind,
       zone,
       service: "standard",
-      name: input.customerName,
+      name: customerName,
+      firstName: input.customerFirstName,
+      lastName: input.customerLastName,
       email: input.customerEmail,
       phone: input.customerPhone,
       from: input.fromAddress,
@@ -354,6 +448,7 @@ export const quotes = {
 
     return {
       ref: quote.ref,
+      orderNumber,
       trackingNumber,
       total: price.total,
       breakdown: price.lines,

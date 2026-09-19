@@ -34,7 +34,8 @@ export function FormCovoiturage() {
   const [poids, setPoids] = useState("4");
   const [result, setResult] = useState<DevisDetaille | null>(null);
 
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [message, setMessage] = useState("");
@@ -69,9 +70,10 @@ export function FormCovoiturage() {
         distanceKm: km,
         weightKg: poidsNum,
         gabarit,
-        customerName: name,
+        customerFirstName: firstName,
+        customerLastName: lastName,
         customerEmail: email,
-        customerPhone: phone || undefined,
+        customerPhone: phone,
         message: message || undefined,
         locale: lang,
       },
@@ -222,11 +224,13 @@ export function FormCovoiturage() {
               {t({ fr: "3. Vos coordonnées", en: "3. Your details" })}
             </h3>
             <ContactFields
-              name={name}
+              firstName={firstName}
+              lastName={lastName}
               email={email}
               phone={phone}
               message={message}
-              onName={setName}
+              onFirstName={setFirstName}
+              onLastName={setLastName}
               onEmail={setEmail}
               onPhone={setPhone}
               onMessage={setMessage}
