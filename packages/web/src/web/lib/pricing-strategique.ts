@@ -5,8 +5,9 @@
  *
  * Deux règles structurantes :
  *  1. tout prix affiché se termine par X,99 € (`appliquerTarifStrategique`) ;
- *  2. le covoiturage ne descend jamais sous 8,99 € et ne dépasse pas 10 kg
- *     (au-delà : devis sur mesure).
+ *  2. le covoiturage ne descend jamais sous 8,99 € ; il n'y a plus de limite de kilos,
+ *     le poids au-delà de 10 kg est facturé au kilo supplémentaire jusqu'à 100 kg
+ *     (au-delà de 100 kg : devis sur mesure, traité en fret).
  *
  * Les montants sortent TTC : le prix affiché est le prix payé.
  */
@@ -19,8 +20,12 @@ export const TARIF = {
     prixKm: 0.035,
     /** Prix minimum affiché — sert aussi d'accroche « dès 8,99 € ». */
     prixMinimum: 8.99,
-    /** Au-delà : hors covoiturage, renvoi vers un devis sur mesure. */
-    maxKg: 10,
+    /** Poids au-delà duquel chaque kilo est facturé en supplément. */
+    seuilKg: 10,
+    /** Supplément, en € par kilo au-delà du seuil. */
+    supplementParKg: 0.45,
+    /** Limite haute du formulaire : au-delà, devis sur mesure traité en fret. */
+    maxKg: 100,
   },
   international: {
     /** Aérien cargo / GP : prix au kilo, dédouanement inclus à l'agence locale. */
@@ -40,18 +45,29 @@ export const TARIF = {
   },
 } as const;
 
-/** Poids maximum accepté par l'offre covoiturage. */
+/** Poids au-delà duquel le covoiturage facture un supplément au kilo. */
+export const COVOITURAGE_SEUIL_KG = TARIF.covoiturage.seuilKg;
+/** Supplément covoiturage, en € par kilo au-delà du seuil. */
+export const COVOITURAGE_SUPPLEMENT_PAR_KG = TARIF.covoiturage.supplementParKg;
+/** Poids au-delà duquel on bascule sur un devis sur mesure (fret). */
 export const COVOITURAGE_MAX_KG = TARIF.covoiturage.maxKg;
 
 /**
- * Facteur poids du covoiturage : < 1 kg = 1.0, 1–5 kg = 1.3, 5–10 kg = 1.6.
- * Au-delà de 10 kg l'offre ne s'applique plus (voir `COVOITURAGE_MAX_KG`).
+ * Facteur poids du covoiturage : < 1 kg = 1.0, 1–5 kg = 1.3, 5 kg et plus = 1.6.
+ * Au-delà du seuil de 10 kg, le facteur reste à 1.6 et chaque kilo en plus est
+ * facturé séparément (voir `supplementPoids`).
  */
 export function facteurPoids(poidsKg: number): number {
   const p = poidsKg || 0;
   if (p >= 1 && p < 5) return 1.3;
   if (p >= 5) return 1.6;
   return 1.0;
+}
+
+/** Supplément en € pour les kilos au-delà du seuil covoiturage. */
+export function supplementPoids(poidsKg: number): number {
+  const excedent = Math.max(0, (poidsKg || 0) - TARIF.covoiturage.seuilKg);
+  return excedent * TARIF.covoiturage.supplementParKg;
 }
 
 const centimes = (n: number) => Math.round(n * 100) / 100;
@@ -115,8 +131,10 @@ export function devisDetaille(typeService: TypeService, options: DevisOptions): 
     const c = TARIF.covoiturage;
     const km = options.distance || 0;
     const kilometrique = km * c.prixKm;
-    const facteur = facteurPoids(options.poids || 0);
-    brut = (kilometrique + c.fraisFixes) * facteur;
+    const poids = options.poids || 0;
+    const facteur = facteurPoids(poids);
+    const supplement = supplementPoids(poids);
+    brut = (kilometrique + c.fraisFixes) * facteur + supplement;
     lines.push(
       {
         key: "prise-en-charge",
@@ -142,7 +160,18 @@ export function devisDetaille(typeService: TypeService, options: DevisOptions): 
         amount: centimes((kilometrique + c.fraisFixes) * (facteur - 1)),
       });
     }
-    etaDays = [1, 3];
+    if (supplement > 0) {
+      const excedent = centimes(poids - c.seuilKg);
+      lines.push({
+        key: "poids-excedent",
+        label: {
+          fr: `Poids au-delà de ${c.seuilKg} kg (${excedent.toString().replace(".", ",")} kg × ${c.supplementParKg.toFixed(2).replace(".", ",")} €)`,
+          en: `Weight above ${c.seuilKg} kg (${excedent} kg × €${c.supplementParKg.toFixed(2)})`,
+        },
+        amount: centimes(supplement),
+      });
+    }
+    etaDays = poids > c.seuilKg ? [1, 4] : [1, 3];
   }
 
   if (typeService === "international") {
@@ -291,6 +320,16 @@ export const GABARITS = [
     poidsDefaut: 8,
     label: { fr: "Grand", en: "Large" },
     exemple: { fr: "Valise, gros carton — 5 à 10 kg", en: "Suitcase, large box — 5 to 10 kg" },
+  },
+  {
+    id: "hors-norme",
+    maxKg: TARIF.covoiturage.maxKg,
+    poidsDefaut: 25,
+    label: { fr: "Hors norme", en: "Oversized" },
+    exemple: {
+      fr: "Électroménager, mobilier, palette légère — au-delà de 10 kg",
+      en: "Appliance, furniture, light pallet — over 10 kg",
+    },
   },
 ] as const;
 

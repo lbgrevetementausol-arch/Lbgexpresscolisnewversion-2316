@@ -5,6 +5,8 @@ import { useI18n } from "../../lib/i18n";
 import { trackLead } from "../../lib/pixels";
 import {
   COVOITURAGE_MAX_KG,
+  COVOITURAGE_SEUIL_KG,
+  COVOITURAGE_SUPPLEMENT_PAR_KG,
   devisDetaille,
   GABARITS,
   type DevisDetaille,
@@ -19,7 +21,8 @@ import { cn } from "@/lib/utils";
 
 /**
  * Formulaire 1 — Covoiturage de colis, France métropolitaine uniquement.
- * Champs propres à l'offre : villes françaises, gabarit visuel, poids plafonné à 10 kg.
+ * Champs propres à l'offre : villes françaises, gabarit visuel, poids sans limite de gabarit
+ * jusqu'à 100 kg (supplément au kilo au-delà de 10 kg), devis sur mesure au-delà.
  */
 export function FormCovoiturage() {
   const { t, lang } = useI18n();
@@ -143,7 +146,7 @@ export function FormCovoiturage() {
 
         <Card hover={false}>
           <h3 className="font-display text-lg font-bold">{t({ fr: "2. Votre colis", en: "2. Your parcel" })}</h3>
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {GABARITS.map((g) => (
               <button
                 key={g.id}
@@ -162,6 +165,7 @@ export function FormCovoiturage() {
                     "size-5",
                     g.id === "petit" && "size-4",
                     g.id === "grand" && "size-7",
+                    g.id === "hors-norme" && "size-8",
                     gabarit === g.id ? "text-primary" : "text-muted",
                   )}
                 />
@@ -174,8 +178,8 @@ export function FormCovoiturage() {
             <Field
               label={t({ fr: "Poids réel (kg)", en: "Actual weight (kg)" })}
               hint={t({
-                fr: `Jusqu'à ${COVOITURAGE_MAX_KG} kg en covoiturage.`,
-                en: `Up to ${COVOITURAGE_MAX_KG} kg on shared routes.`,
+                fr: `Pas de limite de gabarit : jusqu'à ${COVOITURAGE_SEUIL_KG} kg inclus au tarif standard, puis ${COVOITURAGE_SUPPLEMENT_PAR_KG.toFixed(2).replace(".", ",")} € par kilo supplémentaire jusqu'à ${COVOITURAGE_MAX_KG} kg.`,
+                en: `No size cap: up to ${COVOITURAGE_SEUIL_KG} kg at the standard rate, then €${COVOITURAGE_SUPPLEMENT_PAR_KG.toFixed(2)} per extra kilo up to ${COVOITURAGE_MAX_KG} kg.`,
               })}
             >
               <Input
@@ -194,8 +198,8 @@ export function FormCovoiturage() {
           {horsGabarit ? (
             <p className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm leading-relaxed">
               {t({
-                fr: `Au-delà de ${COVOITURAGE_MAX_KG} kg, le colis sort de l'offre covoiturage : demandez un devis sur mesure, nous le traitons en fret.`,
-                en: `Above ${COVOITURAGE_MAX_KG} kg the parcel leaves the ride-sharing offer: ask for a custom quote, we handle it as freight.`,
+                fr: `Au-delà de ${COVOITURAGE_MAX_KG} kg, le colis sort du calcul automatique : demandez un devis sur mesure, nous le traitons en fret — sans limite de poids.`,
+                en: `Above ${COVOITURAGE_MAX_KG} kg the parcel leaves the instant calculator: ask for a custom quote, we handle it as freight — with no weight limit.`,
               })}{" "}
               <a href="/devis" className="font-semibold text-primary underline">
                 {t({ fr: "Devis sur mesure", en: "Custom quote" })}
