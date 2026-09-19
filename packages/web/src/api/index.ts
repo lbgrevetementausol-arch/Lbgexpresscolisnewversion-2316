@@ -19,6 +19,7 @@ import { content } from "./routes/content";
 import { driverAccount } from "./routes/driver-account";
 import { driverAdmin } from "./routes/driver-admin";
 import { drivers } from "./routes/drivers";
+import { geo } from "./routes/geo";
 import { invoices } from "./routes/invoices";
 import { ping } from "./routes/ping";
 import { pro } from "./routes/pro";
@@ -42,6 +43,7 @@ export const router = {
   driverAdmin,
   pro,
   content,
+  geo,
   admin,
   invoices,
   support,

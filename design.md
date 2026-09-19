@@ -66,4 +66,4 @@ Composants partagés : `components/site/header.tsx` (nav sticky + switch langue 
 - Tarification centralisée dans `src/api/lib/pricing.ts` (grille poids × distance zone × service × options) — même fonction utilisée par le calculateur public et le devis.
 - i18n maison FR/EN : `src/web/lib/i18n.tsx` (contexte + dictionnaire, persistance `localStorage`).
 - Thème : classe `light` sur `<html>`, persistée, dark par défaut.
-- Google Maps Places Autocomplete chargé à la demande via `hooks/use-google-maps.ts` avec `VITE_GOOGLE_MAPS_API_KEY`.
+- Autocomplétion d'adresses open source : `hooks/use-address-search.ts` (debounce 300 ms) -> route serveur `geo.search` (`api/routes/geo.ts`) qui interroge Photon puis Nominatim en repli, avec cache 15 min et limite 1 req/s sur Nominatim. Aucune clé API, chaque suggestion renvoie lat/lng pour le calcul de distance.

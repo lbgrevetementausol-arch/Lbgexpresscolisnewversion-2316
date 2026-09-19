@@ -128,6 +128,7 @@ export function FormInternational() {
               <AddressInput
                 required
                 country="fr"
+                cityOnly
                 value={depart}
                 onChange={(v) => {
                   setDepart(v);

@@ -6,7 +6,7 @@ import { distanceRoutiereKm, type DevisDetaille } from "../../lib/pricing-strate
 import { Field, Input, Textarea } from "./field";
 import { Card } from "./section";
 
-/** Coordonnées d'une adresse choisie dans l'autocomplétion Google. */
+/** Coordonnées d'une adresse choisie dans l'autocomplétion OpenStreetMap. */
 export type PlacePoint = { address: string; lat?: number; lng?: number };
 
 /**

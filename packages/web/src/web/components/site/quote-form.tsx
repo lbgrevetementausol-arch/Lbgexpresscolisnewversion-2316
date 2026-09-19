@@ -136,7 +136,7 @@ export function QuoteForm({ variant }: { variant: QuoteVariant }) {
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <Field
               label={t({ fr: "Adresse d'enlèvement", en: "Pickup address" })}
-              hint={t({ fr: "Autocomplétion Google", en: "Google autocomplete" })}
+              hint={t({ fr: "Autocomplétion OpenStreetMap", en: "OpenStreetMap autocomplete" })}
             >
               <AddressInput
                 value={fromAddress}

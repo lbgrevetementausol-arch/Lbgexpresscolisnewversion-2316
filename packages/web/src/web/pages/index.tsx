@@ -99,8 +99,8 @@ const STEPS = [
   {
     fr: "Validez votre commande",
     en: "Confirm your order",
-    descFr: "Adresses complétées par Google, options d'assurance et d'emballage, paiement en ligne.",
-    descEn: "Google-completed addresses, insurance and packing options, online payment.",
+    descFr: "Adresses complétées automatiquement, options d'assurance et d'emballage, paiement en ligne.",
+    descEn: "Auto-completed addresses, insurance and packing options, online payment.",
   },
   {
     fr: "Nous enlevons le colis",

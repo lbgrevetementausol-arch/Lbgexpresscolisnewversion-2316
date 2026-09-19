@@ -93,6 +93,7 @@ export function FormCovoiturage() {
               <AddressInput
                 required
                 country="fr"
+                cityOnly
                 value={route.from.address}
                 onChange={(v) => {
                   route.setFrom({ address: v });
@@ -109,6 +110,7 @@ export function FormCovoiturage() {
               <AddressInput
                 required
                 country="fr"
+                cityOnly
                 value={route.to.address}
                 onChange={(v) => {
                   route.setTo({ address: v });
