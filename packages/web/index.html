@@ -91,6 +91,44 @@
 				src="https://www.facebook.com/tr?id=1186689563634885&ev=PageView&noscript=1"
 		/></noscript>
 		<!-- End Meta Pixel Code -->
+
+		<!-- Google tag (gtag.js) -->
+		<script async src="https://www.googletagmanager.com/gtag/js?id=G-8MQQQB1L8X"></script>
+		<script>
+			window.dataLayer = window.dataLayer || [];
+			function gtag() {
+				dataLayer.push(arguments);
+			}
+			// Consent Mode : refus par défaut jusqu'au choix du visiteur (voir src/web/lib/consent.ts).
+			gtag('consent', 'default', {
+				ad_storage: 'denied',
+				ad_user_data: 'denied',
+				ad_personalization: 'denied',
+				analytics_storage: 'denied',
+				wait_for_update: 500,
+			});
+			gtag('js', new Date());
+			gtag('config', 'G-8MQQQB1L8X');
+			gtag('config', 'AW-18432366308');
+		</script>
+
+		<!-- Event snippet for Envoi de formulaire de lead conversion page -->
+		<script>
+			function gtag_report_conversion(url) {
+				var callback = function () {
+					if (typeof url != 'undefined') {
+						window.location = url;
+					}
+				};
+				gtag('event', 'conversion', {
+					send_to: 'AW-18432366308/WhRBCL-J8_gcEOStntVE',
+					value: 1.0,
+					currency: 'EUR',
+					event_callback: callback,
+				});
+				return false;
+			}
+		</script>
 	</head>
 	<body>
 		<!-- Google Tag Manager (noscript) -->
