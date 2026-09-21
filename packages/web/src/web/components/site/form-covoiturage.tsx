@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Info, Package } from "lucide-react";
+import { Check, Info, Package } from "lucide-react";
 import { useI18n } from "../../lib/i18n";
 import { trackLead } from "../../lib/pixels";
 import {
@@ -87,13 +87,15 @@ export function FormCovoiturage() {
   };
 
   return (
-    <form onSubmit={submit} className="grid gap-8 lg:grid-cols-[1.55fr_1fr] lg:items-start">
-      <div className="space-y-6">
-        <Card hover={false}>
-          <h3 className="font-display text-lg font-bold">
+    <form onSubmit={submit} className="grid gap-6 lg:grid-cols-[1.55fr_1fr] lg:items-start">
+      {/* Tunnel volontairement compact : l'étape 2 et le bouton de calcul doivent tenir
+          dans un écran sans défilement, c'est là que se jouent les conversions. */}
+      <div className="space-y-4">
+        <Card hover={false} className="p-5">
+          <h3 className="font-display text-base font-bold sm:text-lg">
             {t({ fr: "1. Votre trajet en France", en: "1. Your route in France" })}
           </h3>
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <Field label={t({ fr: "Ville de départ", en: "Departure city" })}>
               <AddressInput
                 required
@@ -108,7 +110,10 @@ export function FormCovoiturage() {
                   route.onFrom(p);
                   reset();
                 }}
-                placeholder={t({ fr: "Paris", en: "Paris" })}
+                placeholder={t({
+                  fr: "Sélectionnez votre ville de départ",
+                  en: "Select your departure city",
+                })}
               />
             </Field>
             <Field label={t({ fr: "Ville d'arrivée", en: "Arrival city" })}>
@@ -125,7 +130,10 @@ export function FormCovoiturage() {
                   route.onTo(p);
                   reset();
                 }}
-                placeholder={t({ fr: "Lille", en: "Lille" })}
+                placeholder={t({
+                  fr: "Sélectionnez votre ville d'arrivée",
+                  en: "Select your arrival city",
+                })}
               />
             </Field>
             <DistanceField
@@ -137,7 +145,7 @@ export function FormCovoiturage() {
               }}
             />
           </div>
-          <p className="mt-4 flex items-start gap-2 text-xs text-muted">
+          <p className="mt-3 flex items-start gap-2 text-xs leading-snug text-muted">
             <Info className="mt-0.5 size-4 shrink-0 text-primary" />
             {t({
               fr: "Offre réservée à la France métropolitaine. Pour un envoi vers l'étranger, utilisez le formulaire Fret international.",
@@ -146,9 +154,11 @@ export function FormCovoiturage() {
           </p>
         </Card>
 
-        <Card hover={false}>
-          <h3 className="font-display text-lg font-bold">{t({ fr: "2. Votre colis", en: "2. Your parcel" })}</h3>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card hover={false} className="p-5">
+          <h3 className="font-display text-base font-bold sm:text-lg">
+            {t({ fr: "2. Votre colis", en: "2. Your parcel" })}
+          </h3>
+          <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
             {GABARITS.map((g) => (
               <button
                 key={g.id}
@@ -156,7 +166,7 @@ export function FormCovoiturage() {
                 onClick={() => choisirGabarit(g.id)}
                 aria-pressed={gabarit === g.id}
                 className={cn(
-                  "rounded-xl border p-4 text-left transition",
+                  "rounded-xl border p-3 text-left transition",
                   gabarit === g.id
                     ? "border-primary bg-primary/10"
                     : "border-border bg-surface-2/60 hover:border-primary/40",
@@ -164,26 +174,21 @@ export function FormCovoiturage() {
               >
                 <Package
                   className={cn(
-                    "size-5",
-                    g.id === "petit" && "size-4",
-                    g.id === "grand" && "size-7",
-                    g.id === "hors-norme" && "size-8",
+                    "size-4",
+                    g.id === "grand" && "size-5",
+                    g.id === "hors-norme" && "size-6",
                     gabarit === g.id ? "text-primary" : "text-muted",
                   )}
                 />
-                <span className="mt-3 block font-display text-base font-bold">{t(g.label)}</span>
-                <span className="mt-1 block text-xs leading-relaxed text-muted">{t(g.exemple)}</span>
+                <span className="mt-1 block font-display text-sm font-bold leading-tight">{t(g.label)}</span>
+                <span className="mt-0.5 block truncate text-[0.7rem] leading-snug text-muted" title={t(g.exemple)}>
+                  {t(g.exemple)}
+                </span>
               </button>
             ))}
           </div>
-          <div className="mt-5 max-w-xs">
-            <Field
-              label={t({ fr: "Poids réel (kg)", en: "Actual weight (kg)" })}
-              hint={t({
-                fr: `Pas de limite de gabarit : jusqu'à ${COVOITURAGE_SEUIL_KG} kg inclus au tarif standard, puis ${COVOITURAGE_SUPPLEMENT_PAR_KG.toFixed(2).replace(".", ",")} € par kilo supplémentaire jusqu'à ${COVOITURAGE_MAX_KG} kg.`,
-                en: `No size cap: up to ${COVOITURAGE_SEUIL_KG} kg at the standard rate, then €${COVOITURAGE_SUPPLEMENT_PAR_KG.toFixed(2)} per extra kilo up to ${COVOITURAGE_MAX_KG} kg.`,
-              })}
-            >
+          <div className="mt-3 max-w-[9rem]">
+            <Field label={t({ fr: "Poids réel (kg)", en: "Actual weight (kg)" })}>
               <Input
                 type="number"
                 min={0.1}
@@ -197,6 +202,12 @@ export function FormCovoiturage() {
               />
             </Field>
           </div>
+          <p className="mt-2 text-xs leading-snug text-muted">
+            {t({
+              fr: `Pas de limite de gabarit : jusqu'à ${COVOITURAGE_SEUIL_KG} kg inclus au tarif standard, puis ${COVOITURAGE_SUPPLEMENT_PAR_KG.toFixed(2).replace(".", ",")} € par kilo supplémentaire jusqu'à ${COVOITURAGE_MAX_KG} kg.`,
+              en: `No size cap: up to ${COVOITURAGE_SEUIL_KG} kg at the standard rate, then €${COVOITURAGE_SUPPLEMENT_PAR_KG.toFixed(2)} per extra kilo up to ${COVOITURAGE_MAX_KG} kg.`,
+            })}
+          </p>
           {horsGabarit ? (
             <p className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm leading-relaxed">
               {t({
@@ -208,13 +219,27 @@ export function FormCovoiturage() {
               </a>
             </p>
           ) : null}
-          <div className="mt-6">
+          <div className="mt-4">
             <CalcButton
               label={t({ fr: "Calculer mon tarif Covoiturage", en: "Calculate my ride-share price" })}
               done={result !== null}
               disabled={!pret || horsGabarit}
               onClick={calculer}
             />
+            {/* Micro-preuves juste sous le bouton : lèvent les trois freins du tunnel
+                (engagement, confiance dans le conducteur, sécurité du paiement). */}
+            <p className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+              {[
+                t({ fr: "Devis gratuit et sans engagement", en: "Free quote, no commitment" }),
+                t({ fr: "Profils de conducteurs vérifiés", en: "Verified driver profiles" }),
+                t({ fr: "Paiement sécurisé par myPOS", en: "Secure payment by myPOS" }),
+              ].map((item) => (
+                <span key={item} className="inline-flex items-center gap-1.5">
+                  <Check className="size-3.5 shrink-0 text-success" aria-hidden />
+                  {item}
+                </span>
+              ))}
+            </p>
           </div>
         </Card>
 

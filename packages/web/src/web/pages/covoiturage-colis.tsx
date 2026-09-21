@@ -118,7 +118,9 @@ export default function CovoiturageColisPage() {
         </div>
       </Section>
 
-      <Section className="border-t border-border bg-surface/40" id="devis">
+      {/* Section du calculateur resserrée : l'utilisateur doit atteindre le bouton
+          de calcul sans défiler, l'en-tête ne doit donc pas manger l'écran. */}
+      <Section className="border-t border-border bg-surface/40 py-12 md:py-14" id="devis">
         <SectionHead
           eyebrow={t({ fr: "Votre envoi", en: "Your shipment" })}
           title={t({ fr: "Calculez votre trajet en 60 secondes", en: "Price your route in 60 seconds" })}
@@ -126,8 +128,9 @@ export default function CovoiturageColisPage() {
             fr: "Vos petits colis dès 8,99 € sur les trajets courts. Renseignez les deux villes et le gabarit, lancez le calcul : le prix affiché est ferme, c'est celui que vous payez.",
             en: "Small parcels from €8.99 on short routes. Enter both cities and the size, run the calculation: the price shown is firm, and it is the one you pay.",
           })}
+          className="[&_h2]:text-2xl [&_h2]:md:text-3xl [&_p]:mt-3 [&_p]:text-[0.95rem]"
         />
-        <div className="mt-10">
+        <div className="mt-6">
           <FormCovoiturage />
         </div>
       </Section>

@@ -109,7 +109,7 @@ export function DistanceField({
         max={5000}
         value={km}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="240"
+        placeholder={t({ fr: "Calculée automatiquement", en: "Filled automatically" })}
       />
     </Field>
   );
