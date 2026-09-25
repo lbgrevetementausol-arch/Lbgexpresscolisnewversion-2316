@@ -3,6 +3,7 @@ import { useI18n } from "../lib/i18n";
 import { PageHero } from "../components/site/layout";
 import { Card, Section, SectionHead } from "../components/site/section";
 import { FormDemenagement } from "../components/site/form-demenagement";
+import { TrustBadges } from "../components/site/trust-badges";
 import { Reveal } from "../components/site/reveal";
 import { useSeo } from "../lib/seo";
 import { SEO_ROUTES } from "../lib/seo-routes";
@@ -61,10 +62,13 @@ export default function DemenagementPage() {
           en: "Estimate your move by volume, with or without packing, floors and elevator taken into account. Instant quote, free survey above 30 m³.",
         })}
         image="/images/demenagement.jpg"
+        compact
       />
 
-      <Section>
+      {/* Formulaire dès le premier écran : c'est l'action attendue en arrivant. */}
+      <Section className="py-10 md:py-12" id="devis">
         <FormDemenagement />
+        <TrustBadges className="mt-6" />
       </Section>
 
       <Section className="border-t border-border bg-surface/40">

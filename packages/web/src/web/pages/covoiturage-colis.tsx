@@ -3,6 +3,7 @@ import { useI18n } from "../lib/i18n";
 import { PageHero } from "../components/site/layout";
 import { Card, Section, SectionHead } from "../components/site/section";
 import { FormCovoiturage } from "../components/site/form-covoiturage";
+import { TrustBadges } from "../components/site/trust-badges";
 import { Reveal } from "../components/site/reveal";
 import { useSeo } from "../lib/seo";
 import { SEO_ROUTES } from "../lib/seo-routes";
@@ -87,7 +88,26 @@ export default function CovoiturageColisPage() {
           en: "Your parcel rides in a vehicle already making the trip. The route is shared, so you don't pay for a whole truck — only the space your parcel takes. Professional carriers, in-person handover, firm price before you order.",
         })}
         image="/images/livraison.jpg"
+        compact
       />
+
+      {/* Section du calculateur resserrée : l'utilisateur doit atteindre le bouton
+          de calcul sans défiler, l'en-tête ne doit donc pas manger l'écran. */}
+      <Section className="border-t border-border bg-surface/40 py-12 md:py-14" id="devis">
+        <SectionHead
+          eyebrow={t({ fr: "Votre envoi", en: "Your shipment" })}
+          title={t({ fr: "Calculez votre trajet en 60 secondes", en: "Price your route in 60 seconds" })}
+          lead={t({
+            fr: "Vos petits colis dès 8,99 € sur les trajets courts. Renseignez les deux villes et le gabarit, lancez le calcul : le prix affiché est ferme, c'est celui que vous payez.",
+            en: "Small parcels from €8.99 on short routes. Enter both cities and the size, run the calculation: the price shown is firm, and it is the one you pay.",
+          })}
+          className="[&_h2]:text-2xl [&_h2]:md:text-3xl [&_p]:mt-3 [&_p]:text-[0.95rem]"
+        />
+        <div className="mt-6">
+          <FormCovoiturage />
+        </div>
+        <TrustBadges className="mt-6" />
+      </Section>
 
       <Section>
         <SectionHead
@@ -118,22 +138,6 @@ export default function CovoiturageColisPage() {
         </div>
       </Section>
 
-      {/* Section du calculateur resserrée : l'utilisateur doit atteindre le bouton
-          de calcul sans défiler, l'en-tête ne doit donc pas manger l'écran. */}
-      <Section className="border-t border-border bg-surface/40 py-12 md:py-14" id="devis">
-        <SectionHead
-          eyebrow={t({ fr: "Votre envoi", en: "Your shipment" })}
-          title={t({ fr: "Calculez votre trajet en 60 secondes", en: "Price your route in 60 seconds" })}
-          lead={t({
-            fr: "Vos petits colis dès 8,99 € sur les trajets courts. Renseignez les deux villes et le gabarit, lancez le calcul : le prix affiché est ferme, c'est celui que vous payez.",
-            en: "Small parcels from €8.99 on short routes. Enter both cities and the size, run the calculation: the price shown is firm, and it is the one you pay.",
-          })}
-          className="[&_h2]:text-2xl [&_h2]:md:text-3xl [&_p]:mt-3 [&_p]:text-[0.95rem]"
-        />
-        <div className="mt-6">
-          <FormCovoiturage />
-        </div>
-      </Section>
 
       <Section>
         <SectionHead

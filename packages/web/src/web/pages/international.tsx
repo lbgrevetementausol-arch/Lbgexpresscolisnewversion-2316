@@ -3,6 +3,7 @@ import { useI18n } from "../lib/i18n";
 import { PageHero } from "../components/site/layout";
 import { Card, Section, SectionHead } from "../components/site/section";
 import { FormInternational } from "../components/site/form-international";
+import { TrustBadges } from "../components/site/trust-badges";
 import { Reveal } from "../components/site/reveal";
 import { useSeo } from "../lib/seo";
 import { SEO_ROUTES } from "../lib/seo-routes";
@@ -61,10 +62,12 @@ export default function InternationalPage() {
           en: "Paris → Cotonou, Lomé and Bamako, by air or by sea. Firm quoted price, invoice with VAT, named insurance and online tracking from departure to final handover.",
         })}
         image="/images/aerien.jpg"
+        compact
       />
 
-      <Section>
-        <Card className="mx-auto max-w-3xl border-primary/25 bg-primary/5">
+      {/* Formulaire dès le premier écran : c'est l'action attendue en arrivant. */}
+      <Section className="py-10 md:py-12" id="devis">
+        <Card className="mb-6 border-primary/25 bg-primary/5">
           <p className="text-sm leading-relaxed text-fg sm:text-base">
             {t({
               fr: "Pour un colis de 10 kg vers l'Afrique de l'Ouest, l'envoi classique par Colissimo International vous coûtera 148,99 € (Tarif officiel La Poste - Zone C), tandis que notre solution de fret / covoiturage vous permet de diviser ce coût par deux.",
@@ -78,9 +81,8 @@ export default function InternationalPage() {
             })}
           </p>
         </Card>
-        <div className="mt-10">
-          <FormInternational />
-        </div>
+        <FormInternational />
+        <TrustBadges className="mt-6" />
       </Section>
 
       <Section className="border-t border-border bg-surface/40">
