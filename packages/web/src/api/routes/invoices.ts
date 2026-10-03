@@ -5,7 +5,7 @@ import { base } from "../__core/app";
 import { db } from "../database";
 import { publishJobOffer } from "../services/job-offers";
 import * as schema from "../database/schema";
-import { createInvoice, ISSUER, myposUrl, VAT_RATE } from "../lib/invoicing";
+import { createInvoice, ISSUER, myposUrl, totalsFor, VAT_RATE } from "../lib/invoicing";
 import { buildPurchase, myposConfig, publicBaseUrl } from "../lib/mypos";
 import { computePrice, generateRef, KIND_COEF, SERVICES, ZONES } from "../lib/pricing";
 import type { ServiceId, ShipmentKind, ZoneId } from "../lib/pricing";
@@ -28,30 +28,27 @@ async function loadInvoice(number: string) {
   return { invoice, items, issuer: ISSUER, paymentUrl: myposUrl() };
 }
 
-/** Détail des lignes facturées à partir d'une commande/devis. */
+/**
+ * Détail des lignes facturées à partir d'une commande/devis.
+ *
+ * IMPORTANT — le montant facturé est TOUJOURS le `priceCents` enregistré sur le
+ * devis, c'est-à-dire le prix ferme annoncé puis accepté par le client. On ne
+ * recalcule jamais le tarif au moment de la facturation : plusieurs paramètres
+ * de la simulation d'origine (distance routière, accès difficile / portage long,
+ * barème en vigueur ce jour-là) ne sont pas stockés en colonnes dédiées, donc un
+ * recalcul produit un montant différent de celui contractualisé. Facturer ce
+ * recalcul revenait à facturer un prix que le client n'a jamais accepté.
+ */
 async function itemsFromQuote(quote: typeof schema.quotes.$inferSelect) {
-  const kind = (quote.kind ?? "colis") as ShipmentKind;
   const zone = (quote.zone ?? "france") as ZoneId;
   const service = (quote.service ?? "standard") as ServiceId;
-  const cfg = await getPricingConfig();
-  const price = computePrice({
-    kind,
-    zone,
-    service,
-    weightKg: quote.weightKg ?? undefined,
-    lengthCm: quote.lengthCm ?? undefined,
-    widthCm: quote.widthCm ?? undefined,
-    heightCm: quote.heightCm ?? undefined,
-    volumeM3: quote.volumeM3 ?? undefined,
-    declaredValue: quote.declaredValue ?? undefined,
-    insurance: quote.insurance ?? false,
-    homePickup: quote.homePickup ?? false,
-    packing: quote.packing ?? false,
-    fragile: quote.fragile ?? false,
-    floors: quote.floors ?? 0,
-    elevator: quote.elevator ?? false,
-    pieces: quote.pieces ?? 1,
-  }, cfg);
+
+  const acceptedCents = Math.round(quote.priceCents ?? 0);
+  if (acceptedCents <= 0) {
+    throw new ORPCError("BAD_REQUEST", {
+      message: `Commande ${quote.ref} : aucun montant de devis enregistré, facturation impossible.`,
+    });
+  }
 
   const detail = [
     `Enlèvement : ${quote.fromAddress}`,
@@ -69,10 +66,10 @@ async function itemsFromQuote(quote: typeof schema.quotes.$inferSelect) {
       detail,
       quantity: 1,
       unit: "forfait",
-      unitPriceCents: Math.round(price.total * 100),
+      unitPriceCents: acceptedCents,
     },
   ];
-  return { lines, price };
+  return { lines, acceptedCents };
 }
 
 export const invoices = {
@@ -134,6 +131,11 @@ export const invoices = {
         }
 
         const { lines } = await itemsFromQuote(quote);
+        // Garde-fou : la facture doit reprendre exactement le devis accepté.
+        const expectedTtc = Math.round(quote.priceCents * (1 + VAT_RATE / 100));
+        if (Math.abs(totalsFor(lines).totalCents - expectedTtc) > 1) {
+          throw new ORPCError("CONFLICT", { message: `Montant de facture différent du devis ${quote.ref} : émission bloquée.` });
+        }
         const { invoice } = await createInvoice({
           quoteRef: quote.ref,
           userId: context.user?.id ?? quote.userId ?? null,

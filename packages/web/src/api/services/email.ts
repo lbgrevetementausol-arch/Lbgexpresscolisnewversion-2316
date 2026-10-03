@@ -127,9 +127,9 @@ export async function mailQuoteReceipt(args: {
   const prenom = args.firstName?.trim() || args.name;
   const numero = args.orderNumber ?? args.ref;
   const html = layout(
-    args.orderNumber ? `Merci ${prenom} — commande n° ${args.orderNumber} confirmée` : `Votre devis ${args.ref} est enregistré`,
+    `Votre devis LBG Express Colis${args.orderNumber ? ` n° ${args.orderNumber}` : ""}`,
     `<p>Bonjour ${esc(prenom)},</p>
-     <p>Merci de votre confiance. Votre commande est bien enregistrée dans notre système : voici le récapitulatif à conserver.</p>
+     <p>Merci de votre confiance. Voici votre devis, à conserver. Il est valable 15 jours.</p>
      ${table(
        row("Numéro de commande", numero) +
          row("Référence dossier", args.ref) +
@@ -137,8 +137,8 @@ export async function mailQuoteReceipt(args: {
          row("Enlèvement", args.from) +
          row("Livraison", args.to_) +
          row("Délai estimé", `${args.etaMin} à ${args.etaMax} jours ouvrés`) +
-         row("Montant HT", euro(args.priceCents)) +
-         row("Montant TTC (TVA 20 %)", euro(Math.round(args.priceCents * 1.2))) +
+         row("Montant TTC", euro(Math.round(args.priceCents * 1.2))) +
+         row("dont HT", euro(args.priceCents)) +
          row("N° de suivi", args.trackingNumber),
      )}
      <p><strong>La suite :</strong> notre équipe vérifie la faisabilité de l'enlèvement et vous rappelle sous 2 heures ouvrées au numéro que vous nous avez laissé. Le règlement se fait depuis votre espace de paiement sécurisé, et l'enlèvement est planifié dès confirmation.</p>
@@ -149,7 +149,7 @@ export async function mailQuoteReceipt(args: {
   return sendEmail({
     to: args.to,
     subject: args.orderNumber
-      ? `Commande n° ${args.orderNumber} confirmée — merci ! — LBG Express Colis`
+      ? `Votre devis LBG Express Colis n° ${args.orderNumber}`
       : `Devis ${args.ref} — LBG Express Colis`,
     html,
   });

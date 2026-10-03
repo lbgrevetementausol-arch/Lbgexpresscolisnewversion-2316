@@ -327,6 +327,15 @@ export const quotes = {
       accesDifficile: input.accesDifficile,
     });
 
+    // Le moteur stratégique sort un prix TTC. En base, priceCents est TOUJOURS HT
+    // (comme le moteur général) : mails, paiement et facture en déduisent le TTC.
+    const ttcCents = Math.round(price.total * 100);
+    const priceCents = Math.round(ttcCents / 1.2);
+    const vol = input.volumeM3 ?? 0;
+    const perM3 = input.typeService === "demenagement" && vol > 0 ? price.total / vol : null;
+    // Garde-fou : prix hors norme → pas de mail client, devis « À valider ».
+    const needsReview = price.total > 2500 || (perM3 !== null && (perM3 < 25 || perM3 > 100));
+
     const kind = STRATEGIQUE_KIND[input.typeService];
     const zone = input.typeService === "international" ? "afrique" : "france";
     const orderNumber = await nextOrderNumber();
@@ -369,7 +378,8 @@ export const quotes = {
         elevator: (input.etagesSansAscenseur ?? 0) === 0,
         goodsDescription: details || undefined,
         message: input.message,
-        priceCents: Math.round(price.total * 100),
+        priceCents,
+        status: needsReview ? "a_valider" : "nouveau",
         breakdown: JSON.stringify(price.lines),
         etaMin: price.etaDays[0],
         etaMax: price.etaDays[1],
@@ -401,7 +411,6 @@ export const quotes = {
       location: input.fromAddress,
     });
 
-    const priceCents = Math.round(price.total * 100);
     const serviceLabel = STRATEGIQUE_LABEL[input.typeService];
     await notifyNewOrder({
       orderNumber,
@@ -414,7 +423,7 @@ export const quotes = {
       to: input.toAddress,
       serviceLabel,
     });
-    await mailQuoteReceipt({
+    if (!needsReview) await mailQuoteReceipt({
       to: input.customerEmail,
       name: customerName,
       firstName: input.customerFirstName,
@@ -443,7 +452,7 @@ export const quotes = {
       to_: input.toAddress,
       priceCents,
       trackingNumber,
-      message: [details, input.message].filter(Boolean).join(" | ") || undefined,
+      message: [needsReview ? `⚠ À VALIDER — aucun mail client envoyé (${(ttcCents / 100).toFixed(2)} € TTC${perM3 ? `, ${perM3.toFixed(1)} €/m³` : ""})` : undefined, details, input.message].filter(Boolean).join(" | ") || undefined,
     });
 
     return {
@@ -495,7 +504,7 @@ export const quotes = {
       await db.insert(schema.payments).values({
         quoteRef: ref,
         provider: input.provider,
-        amountCents: quote.priceCents,
+        amountCents: Math.round(quote.priceCents * 1.2),
         status,
         reference,
         payerEmail: input.payerEmail ?? quote.customerEmail,

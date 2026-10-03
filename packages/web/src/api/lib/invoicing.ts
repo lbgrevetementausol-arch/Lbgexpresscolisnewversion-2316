@@ -49,13 +49,28 @@ export interface DraftItem {
 export function totalsFor(items: DraftItem[], vatRate = VAT_RATE) {
   const lines = items.map((item, index) => {
     const quantity = item.quantity ?? 1;
+    const unitPriceCents = Math.round(item.unitPriceCents);
+    const totalCents = Math.round(unitPriceCents * quantity);
+
+    // Contrôle de cohérence ligne : PU HT × Qté doit toujours égaler le Total HT.
+    // On tolère 1 centime d'écart, qui ne peut venir que de l'arrondi sur une
+    // quantité décimale (ex. 2,5 m³). Au-delà, la ligne est incohérente et la
+    // facture ne doit pas partir chez le client.
+    const expected = unitPriceCents * quantity;
+    if (Math.abs(totalCents - expected) > 1) {
+      throw new Error(
+        `Ligne de facture incohérente « ${item.label} » : ` +
+          `PU HT ${unitPriceCents} × Qté ${quantity} = ${expected}, or Total HT = ${totalCents}.`,
+      );
+    }
+
     return {
       label: item.label,
       detail: item.detail ?? null,
       quantity,
       unit: item.unit ?? "forfait",
-      unitPriceCents: Math.round(item.unitPriceCents),
-      totalCents: Math.round(item.unitPriceCents * quantity),
+      unitPriceCents,
+      totalCents,
       position: index,
     };
   });

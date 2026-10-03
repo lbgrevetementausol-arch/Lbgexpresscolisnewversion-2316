@@ -185,8 +185,8 @@ export default function PaiementPage() {
                   <PayButton
                     target={{ quoteRef: q.ref }}
                     label={t({
-                      fr: `Payer ${moneyCents(q.priceCents, lang)} par carte`,
-                      en: `Pay ${moneyCents(q.priceCents, lang)} by card`,
+                      fr: `Payer ${moneyCents(Math.round(q.priceCents * 1.2), lang)} par carte`,
+                      en: `Pay ${moneyCents(Math.round(q.priceCents * 1.2), lang)} by card`,
                     })}
                     className="w-full py-3.5"
                   />
@@ -271,7 +271,7 @@ export default function PaiementPage() {
             <div className="mt-5 flex items-baseline justify-between border-t border-border pt-5">
               <span className="text-sm text-muted">{t({ fr: "Total TTC", en: "Total incl. VAT" })}</span>
               <span className="font-display text-3xl font-extrabold text-primary">
-                {moneyCents(q.priceCents, lang)}
+                {moneyCents(Math.round(q.priceCents * 1.2), lang)}
               </span>
             </div>
 
