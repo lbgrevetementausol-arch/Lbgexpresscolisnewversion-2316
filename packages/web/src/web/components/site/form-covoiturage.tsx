@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { Check, Info, Package } from "lucide-react";
 import { useI18n } from "../../lib/i18n";
-import { trackLead } from "../../lib/pixels";
+import { trackFunnel, trackLead } from "../../lib/pixels";
 import {
   COVOITURAGE_MAX_KG,
   COVOITURAGE_SEUIL_KG,
@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 export function FormCovoiturage() {
   const { t, lang } = useI18n();
   const [, navigate] = useLocation();
+  const started = useRef(false);
   const route = useRoute();
   const create = useCreateStrategicQuote();
 
@@ -56,7 +57,9 @@ export function FormCovoiturage() {
 
   const calculer = () => {
     if (!pret || horsGabarit) return;
-    setResult(devisDetaille("covoiturage", { distance: km, poids: poidsNum }));
+    const r = devisDetaille("covoiturage", { distance: km, poids: poidsNum });
+    setResult(r);
+    trackFunnel("quote_price_displayed", { service: "covoiturage", value: r.total, currency: "EUR", distance_km: km });
   };
 
   const submit = (e: React.FormEvent) => {
@@ -75,11 +78,12 @@ export function FormCovoiturage() {
         customerEmail: email,
         customerPhone: phone,
         message: message || undefined,
+        clientTotal: result.total,
         locale: lang,
       },
       {
         onSuccess: (data) => {
-          trackLead({ value: data.total, content_name: "Covoiturage de colis", ref: data.ref });
+          trackLead({ value: data.total, currency: "EUR", content_name: "Covoiturage de colis", ref: data.ref, quote_id: data.ref });
           navigate(`/paiement/${data.ref}`);
         },
       },
@@ -87,7 +91,7 @@ export function FormCovoiturage() {
   };
 
   return (
-    <form onSubmit={submit} className="grid gap-6 lg:grid-cols-[1.55fr_1fr] lg:items-start">
+    <form onSubmit={submit} onFocusCapture={() => { if (!started.current) { started.current = true; trackFunnel("quote_start", { service: "covoiturage" }); } }} className="grid gap-6 lg:grid-cols-[1.55fr_1fr] lg:items-start">
       {/* Tunnel volontairement compact : l'étape 2 et le bouton de calcul doivent tenir
           dans un écran sans défilement, c'est là que se jouent les conversions. */}
       <div className="space-y-4">

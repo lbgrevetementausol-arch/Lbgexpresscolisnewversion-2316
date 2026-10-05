@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { Info, Plane, Ship } from "lucide-react";
 import { useI18n } from "../../lib/i18n";
-import { trackLead } from "../../lib/pixels";
+import { trackFunnel, trackLead } from "../../lib/pixels";
 import {
   devisDetaille,
   PAYS_INTERNATIONAL,
@@ -49,6 +49,7 @@ const MODES: {
 export function FormInternational() {
   const { t, lang } = useI18n();
   const [, navigate] = useLocation();
+  const started = useRef(false);
   const create = useCreateStrategicQuote();
 
   const [depart, setDepart] = useState("");
@@ -80,13 +81,13 @@ export function FormInternational() {
 
   const calculer = () => {
     if (!pret) return;
-    setResult(
-      devisDetaille("international", {
-        modeTransport: mode,
-        poids: poidsNum,
-        nombreCartons: cartonsNum,
-      }),
-    );
+    const r = devisDetaille("international", {
+      modeTransport: mode,
+      poids: poidsNum,
+      nombreCartons: cartonsNum,
+    });
+    setResult(r);
+    trackFunnel("quote_price_displayed", { service: "international", value: r.total, currency: "EUR" });
   };
 
   const submit = (e: React.FormEvent) => {
@@ -107,11 +108,12 @@ export function FormInternational() {
         customerEmail: email,
         customerPhone: phone,
         message: message || undefined,
+        clientTotal: result.total,
         locale: lang,
       },
       {
         onSuccess: (data) => {
-          trackLead({ value: data.total, content_name: `Fret international ${mode}`, ref: data.ref });
+          trackLead({ value: data.total, currency: "EUR", content_name: `Fret international ${mode}`, ref: data.ref, quote_id: data.ref });
           navigate(`/paiement/${data.ref}`);
         },
       },
@@ -119,7 +121,7 @@ export function FormInternational() {
   };
 
   return (
-    <form onSubmit={submit} className="grid gap-8 lg:grid-cols-[1.55fr_1fr] lg:items-start">
+    <form onSubmit={submit} onFocusCapture={() => { if (!started.current) { started.current = true; trackFunnel("quote_start", { service: "international" }); } }} className="grid gap-8 lg:grid-cols-[1.55fr_1fr] lg:items-start">
       <div className="space-y-6">
         <Card hover={false}>
           <h3 className="font-display text-lg font-bold">

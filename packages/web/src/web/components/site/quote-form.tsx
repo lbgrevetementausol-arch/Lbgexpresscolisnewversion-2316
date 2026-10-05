@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { AlertTriangle, ArrowRight, Clock, Loader2, ShieldCheck } from "lucide-react";
 import { useI18n } from "../../lib/i18n";
 import { money } from "../../lib/format";
-import { trackLead } from "../../lib/pixels";
+import { trackFunnel, trackLead } from "../../lib/pixels";
 import { useCreateQuote, useEstimate, useQuoteOptions, type EstimateInput } from "../../queries/quotes";
 import { AddressInput } from "./address-input";
 import { Checkbox, Field, Input, Select, Textarea } from "./field";
@@ -29,6 +29,7 @@ function useParams() {
 export function QuoteForm({ variant }: { variant: QuoteVariant }) {
   const { t, lang } = useI18n();
   const [, navigate] = useLocation();
+  const started = useRef(false);
   const options = useQuoteOptions();
   const params = useParams();
 
@@ -119,7 +120,7 @@ export function QuoteForm({ variant }: { variant: QuoteVariant }) {
       },
       {
         onSuccess: (data) => {
-          trackLead({ value: data.total, content_name: `Devis ${kind} ${zone}`, ref: data.ref });
+          trackLead({ value: Math.round(data.total * 120) / 100, currency: "EUR", content_name: `Devis ${kind} ${zone}`, ref: data.ref, quote_id: data.ref });
           navigate(`/paiement/${data.ref}`);
         },
       },
@@ -130,7 +131,7 @@ export function QuoteForm({ variant }: { variant: QuoteVariant }) {
   const services = options.data?.services ?? [];
 
   return (
-    <form onSubmit={submit} className="grid gap-8 lg:grid-cols-[1.55fr_1fr] lg:items-start">
+    <form onSubmit={submit} onFocusCapture={() => { if (!started.current) { started.current = true; trackFunnel("quote_start", { service: "colis" }); } }} className="grid gap-8 lg:grid-cols-[1.55fr_1fr] lg:items-start">
       <div className="space-y-6">
         {/* Trajet */}
         <Card hover={false}>
@@ -418,16 +419,30 @@ export function QuoteForm({ variant }: { variant: QuoteVariant }) {
             {estimate.isLoading && !estimate.data ? (
               <Loader2 className="size-9 animate-spin" />
             ) : (
-              money(estimate.data?.total ?? 0, lang)
+              <>
+                {money(Math.round((estimate.data?.total ?? 0) * 120) / 100, lang)}
+                <span className="ml-2 align-middle text-base font-semibold text-muted">{t({ fr: "TTC", en: "incl. VAT" })}</span>
+              </>
             )}
           </p>
+          {estimate.data ? (
+            <p className="mt-1 text-xs text-muted">
+              {t({
+                fr: `dont ${money(estimate.data.total, lang)} HT + TVA 20 %`,
+                en: `incl. ${money(estimate.data.total, lang)} excl. VAT + 20% VAT`,
+              })}
+            </p>
+          ) : null}
           {estimate.data ? (
             <>
               <p className="mt-2 flex items-center gap-1.5 text-sm text-muted">
                 <Clock className="size-4 text-primary" />
                 {estimate.data.etaDays[0]}–{estimate.data.etaDays[1]} {t({ fr: "jours ouvrés", en: "working days" })}
               </p>
-              <ul className="mt-5 space-y-2 border-t border-border pt-4 text-sm">
+              <p className="mt-5 border-t border-border pt-4 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+                {t({ fr: "Détail HT", en: "Breakdown excl. VAT" })}
+              </p>
+              <ul className="mt-2 space-y-2 text-sm">
                 {estimate.data.breakdown.map((line) => (
                   <li key={line.key} className="flex justify-between gap-4 text-muted">
                     <span>{t(line.label)}</span>
@@ -453,7 +468,7 @@ export function QuoteForm({ variant }: { variant: QuoteVariant }) {
               <Loader2 className="size-5 animate-spin" />
             ) : (
               <>
-                {t({ fr: "Valider ma commande", en: "Confirm my order" })}
+                {t({ fr: "Recevoir mon devis", en: "Get my quote" })}
                 <ArrowRight className="size-4" />
               </>
             )}
@@ -472,8 +487,8 @@ export function QuoteForm({ variant }: { variant: QuoteVariant }) {
           <p className="mt-4 flex items-start gap-2 text-xs text-muted">
             <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" />
             {t({
-              fr: "Aucun prélèvement à cette étape. Vous recevez un numéro de suivi TRK dès la validation.",
-              en: "No charge at this step. You get a TRK tracking number as soon as you confirm.",
+              fr: "Aucun prélèvement à cette étape. Vous recevez votre devis par e-mail, à accepter avant tout paiement.",
+              en: "No charge at this step. You receive your quote by email, to accept before any payment.",
             })}
           </p>
         </Card>

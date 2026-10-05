@@ -202,6 +202,8 @@ export const quotes = {
     const trackingNumber = generateTrackingNumber();
     const orderNumber = await nextOrderNumber();
     const customerName = fullName(input);
+    // Même garde-fou que les formulaires spécialisés : > 2 500 € TTC → « À valider », pas de mail client.
+    const generalReview = besoinValidation({ totalTtc: price.total * 1.2, demenagement: false });
 
     const [quote] = await db
       .insert(schema.quotes)
@@ -236,6 +238,7 @@ export const quotes = {
         message: input.message,
         priceCents: Math.round(price.total * 100),
         priceTtcCents: Math.round(Math.round(price.total * 100) * 1.2),
+        status: generalReview ? "a_valider" : "nouveau",
         validUntil: new Date(Date.now() + VALIDITE_JOURS * 86400000),
         breakdown: JSON.stringify(price.breakdown),
         etaMin: price.etaDays[0],
@@ -281,7 +284,7 @@ export const quotes = {
       to: input.toAddress,
       serviceLabel,
     });
-    await mailQuoteReceipt({
+    if (!generalReview) await mailQuoteReceipt({
       to: input.customerEmail,
       name: customerName,
       firstName: input.customerFirstName,
@@ -311,7 +314,7 @@ export const quotes = {
       to_: input.toAddress,
       priceCents,
       trackingNumber,
-      message: input.message,
+      message: [generalReview ? "⚠ À VALIDER — aucun mail client envoyé (> 2 500 € TTC)" : undefined, input.message].filter(Boolean).join(" | ") || undefined,
     });
 
     return {
@@ -322,6 +325,7 @@ export const quotes = {
       breakdown: price.breakdown,
       etaDays: price.etaDays,
       chargeableWeight: price.chargeableWeight,
+      status: generalReview ? "a_valider" : "nouveau",
     };
   }),
 
@@ -337,6 +341,12 @@ export const quotes = {
       });
     }
 
+    if (input.typeService === "covoiturage" && (!(input.distanceKm && input.distanceKm > 0) || !(input.weightKg && input.weightKg > 0))) {
+      throw new ORPCError("BAD_REQUEST", { message: "Distance ou poids manquant : indiquez la distance en km et le poids en kg." });
+    }
+    if (input.typeService === "international" && !(input.modeTransport === "avion" ? (input.weightKg ?? 0) > 0 : (input.cartons ?? 0) > 0)) {
+      throw new ORPCError("BAD_REQUEST", { message: "Poids (aérien) ou nombre de cartons (maritime) manquant." });
+    }
     if (input.typeService === "demenagement" && (!(input.distanceKm && input.distanceKm > 0) || !(input.volumeM3 && input.volumeM3 > 0))) {
       throw new ORPCError("BAD_REQUEST", {
         message: "Distance ou volume manquant : indiquez la distance en km et le volume en m³.",
