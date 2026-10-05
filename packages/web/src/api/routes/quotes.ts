@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { base } from "../__core/app";
 import { db } from "../database";
@@ -19,10 +19,11 @@ import { nextOrderNumber } from "../lib/order-number";
 import {
   COVOITURAGE_MAX_KG,
   devisDetaille,
+  needsReview as besoinValidation,
   PAYS_INTERNATIONAL,
   type TypeService,
 } from "../../web/lib/pricing-strategique";
-import { mailQuoteOps, mailQuoteReceipt } from "../services/email";
+import { mailQuoteAccepted, mailQuoteOps, mailQuoteReceipt } from "../services/email";
 
 const zoneEnum = z.enum(Object.keys(ZONES) as [ZoneId, ...ZoneId[]]);
 const serviceEnum = z.enum(Object.keys(SERVICES) as [ServiceId, ...ServiceId[]]);
@@ -105,6 +106,13 @@ const quoteInput = priceInput.extend({
 });
 
 /** Entrée des 3 formulaires spécialisés (moteur « tarif stratégique »). */
+/** Validité d'un devis, en jours. */
+export const VALIDITE_JOURS = 15;
+/** Statuts où le devis est accepté (paiement / facturation autorisés). */
+export const ACCEPTED_STATUSES = ["accepte", "paye", "en_cours", "livre"];
+const isExpired = (q: { validUntil: Date | null; createdAt: Date }) =>
+  Date.now() > (q.validUntil ?? new Date(q.createdAt.getTime() + VALIDITE_JOURS * 86400000)).getTime();
+
 const strategiqueInput = z.object({
   typeService: z.enum(["covoiturage", "international", "demenagement"]),
   fromAddress: z.string().min(3).max(400),
@@ -118,6 +126,15 @@ const strategiqueInput = z.object({
   volumeM3: z.number().min(0).max(500).optional(),
   etagesSansAscenseur: z.number().min(0).max(30).optional(),
   accesDifficile: z.boolean().optional(),
+  etageDepart: z.number().int().min(0).max(30).optional(),
+  etageArrivee: z.number().int().min(0).max(30).optional(),
+  ascenseurDepart: z.boolean().optional(),
+  ascenseurArrivee: z.boolean().optional(),
+  emballage: z.boolean().optional(),
+  objetsLourds: z.array(z.string().max(40)).max(10).optional(),
+  date: z.string().max(10).optional(),
+  /** Total TTC affiché au client (contrôle d'écart avec le calcul serveur). */
+  clientTotal: z.number().min(0).max(1000000).optional(),
   goodsDescription: z.string().max(1000).optional(),
   ...contactShape,
   message: z.string().max(2000).optional(),
@@ -218,6 +235,8 @@ export const quotes = {
         goodsDescription: input.goodsDescription,
         message: input.message,
         priceCents: Math.round(price.total * 100),
+        priceTtcCents: Math.round(Math.round(price.total * 100) * 1.2),
+        validUntil: new Date(Date.now() + VALIDITE_JOURS * 86400000),
         breakdown: JSON.stringify(price.breakdown),
         etaMin: price.etaDays[0],
         etaMax: price.etaDays[1],
@@ -270,6 +289,7 @@ export const quotes = {
       orderNumber,
       trackingNumber,
       priceCents,
+      validUntil: quote.validUntil,
       from: input.fromAddress,
       to_: input.toAddress,
       etaMin: price.etaDays[0],
@@ -317,6 +337,12 @@ export const quotes = {
       });
     }
 
+    if (input.typeService === "demenagement" && (!(input.distanceKm && input.distanceKm > 0) || !(input.volumeM3 && input.volumeM3 > 0))) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: "Distance ou volume manquant : indiquez la distance en km et le volume en m³.",
+      });
+    }
+
     const price = devisDetaille(input.typeService, {
       distance: input.distanceKm,
       poids: input.weightKg,
@@ -325,6 +351,13 @@ export const quotes = {
       volumeM3: input.volumeM3,
       etagesSansAscenseur: input.etagesSansAscenseur,
       accesDifficile: input.accesDifficile,
+      etageDepart: input.etageDepart,
+      etageArrivee: input.etageArrivee,
+      ascenseurDepart: input.ascenseurDepart,
+      ascenseurArrivee: input.ascenseurArrivee,
+      emballage: input.emballage,
+      objetsLourds: input.objetsLourds,
+      date: input.date,
     });
 
     // Le moteur stratégique sort un prix TTC. En base, priceCents est TOUJOURS HT
@@ -334,7 +367,13 @@ export const quotes = {
     const vol = input.volumeM3 ?? 0;
     const perM3 = input.typeService === "demenagement" && vol > 0 ? price.total / vol : null;
     // Garde-fou : prix hors norme → pas de mail client, devis « À valider ».
-    const needsReview = price.total > 2500 || (perM3 !== null && (perM3 < 25 || perM3 > 100));
+    // Écart > 15 % entre le prix affiché au client et le calcul serveur → suspect.
+    const needsReview = besoinValidation({
+      totalTtc: price.total,
+      volumeM3: input.volumeM3,
+      clientTotal: input.clientTotal,
+      demenagement: input.typeService === "demenagement",
+    });
 
     const kind = STRATEGIQUE_KIND[input.typeService];
     const zone = input.typeService === "international" ? "afrique" : "france";
@@ -352,6 +391,11 @@ export const quotes = {
       input.gabarit ? `Gabarit : ${input.gabarit}` : undefined,
       input.distanceKm ? `Distance estimée : ${Math.round(input.distanceKm)} km` : undefined,
       input.accesDifficile ? "Accès difficile / portage long signalé" : undefined,
+      input.date ? `Date souhaitée : ${input.date} (saison ${price.saison ?? "normale"})` : undefined,
+      input.emballage ? "Emballage / cartons demandés" : undefined,
+      input.objetsLourds?.length ? `Objets lourds : ${input.objetsLourds.join(", ")}` : undefined,
+      price.vehicule ? `Véhicule conseillé : ${price.vehicule} (≈ ${price.poidsEstimeKg} kg estimés)` : undefined,
+      "Devis valable 15 jours",
     ]
       .filter(Boolean)
       .join(" — ");
@@ -374,11 +418,14 @@ export const quotes = {
         weightKg: input.weightKg,
         volumeM3: input.volumeM3,
         pieces: Math.max(1, input.cartons ?? 1),
-        floors: input.etagesSansAscenseur ?? 0,
-        elevator: (input.etagesSansAscenseur ?? 0) === 0,
+        floors: (input.etageDepart ?? 0) + (input.etageArrivee ?? 0) || (input.etagesSansAscenseur ?? 0),
+        elevator: Boolean(input.ascenseurDepart || input.ascenseurArrivee),
+        packing: input.emballage ?? false,
         goodsDescription: details || undefined,
         message: input.message,
         priceCents,
+        priceTtcCents: ttcCents,
+        validUntil: new Date(Date.now() + VALIDITE_JOURS * 86400000),
         status: needsReview ? "a_valider" : "nouveau",
         breakdown: JSON.stringify(price.lines),
         etaMin: price.etaDays[0],
@@ -431,6 +478,9 @@ export const quotes = {
       orderNumber,
       trackingNumber,
       priceCents,
+      ttcCents,
+      lines: price.lines.map((l) => ({ label: l.label.fr, amount: l.amount })),
+      validUntil: quote.validUntil,
       from: input.fromAddress,
       to_: input.toAddress,
       etaMin: price.etaDays[0],
@@ -462,6 +512,7 @@ export const quotes = {
       total: price.total,
       breakdown: price.lines,
       etaDays: price.etaDays,
+      status: needsReview ? "a_valider" : "nouveau",
     };
   }),
 
@@ -480,10 +531,58 @@ export const quotes = {
       .limit(1);
     return {
       ...quote,
+      priceTtcCents: quote.priceTtcCents ?? Math.round(quote.priceCents * 1.2),
+      expired: isExpired(quote),
       breakdown: quote.breakdown ? (JSON.parse(quote.breakdown) as { key: string; label: { fr: string; en: string }; amount: number }[]) : [],
       payment: payment ?? null,
     };
   }),
+
+  /**
+   * Acceptation explicite du devis par le client (case à cocher sur /paiement/:ref).
+   * Idempotente : un devis déjà accepté renvoie simplement son statut, sans second mail.
+   */
+  accept: base
+    .input(z.object({ ref: z.string().min(4).max(40), accept: z.literal(true) }))
+    .handler(async ({ input }) => {
+      const ref = input.ref.trim().toUpperCase();
+      const [quote] = await db.select().from(schema.quotes).where(eq(schema.quotes.ref, ref));
+      if (!quote) throw new ORPCError("NOT_FOUND", { message: "Devis introuvable" });
+      if (ACCEPTED_STATUSES.includes(quote.status)) return { ok: true, status: quote.status, already: true };
+      if (quote.status === "a_valider") {
+        throw new ORPCError("BAD_REQUEST", { message: "Devis en cours de vérification par notre équipe : vous serez recontacté." });
+      }
+      if (quote.status !== "nouveau") throw new ORPCError("BAD_REQUEST", { message: "Ce devis n'est plus valable." });
+      if (isExpired(quote)) {
+        throw new ORPCError("BAD_REQUEST", { message: "Devis expiré (validité 15 jours) : demandez un nouveau devis." });
+      }
+      // Mise à jour conditionnelle : deux clics simultanés ne confirment qu'une fois.
+      const updated = await db
+        .update(schema.quotes)
+        .set({ status: "accepte", acceptedAt: new Date() })
+        .where(and(eq(schema.quotes.id, quote.id), eq(schema.quotes.status, "nouveau")))
+        .returning({ id: schema.quotes.id });
+      if (updated.length === 0) return { ok: true, status: "accepte", already: true };
+      const ttcCents = quote.priceTtcCents ?? Math.round(quote.priceCents * 1.2);
+      if (quote.trackingNumber) {
+        await db.insert(schema.trackingEvents).values({
+          trackingNumber: quote.trackingNumber,
+          status: "cree",
+          labelFr: "Devis accepté — commande confirmée",
+          labelEn: "Quote accepted — order confirmed",
+          location: quote.fromAddress,
+        });
+      }
+      await mailQuoteAccepted({
+        to: quote.customerEmail,
+        name: quote.customerName,
+        firstName: quote.customerFirstName,
+        ref: quote.ref,
+        orderNumber: quote.orderNumber,
+        ttcCents,
+      });
+      return { ok: true, status: "accepte", already: false, value: ttcCents / 100 };
+    }),
 
   /** Enregistrement d'un paiement (virement / carte via prestataire à connecter) */
   pay: base
@@ -498,6 +597,9 @@ export const quotes = {
       const ref = input.ref.trim().toUpperCase();
       const [quote] = await db.select().from(schema.quotes).where(eq(schema.quotes.ref, ref));
       if (!quote) throw new ORPCError("NOT_FOUND", { message: "Devis introuvable" });
+      if (!ACCEPTED_STATUSES.includes(quote.status)) {
+        throw new ORPCError("BAD_REQUEST", { message: "Acceptez d'abord le devis avant le paiement." });
+      }
 
       const reference = generateRef("PAY");
       const status = input.provider === "virement" ? "en_attente" : "confirme";

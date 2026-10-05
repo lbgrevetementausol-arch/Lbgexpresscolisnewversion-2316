@@ -50,3 +50,13 @@ export function useSetInvoiceStatus() {
     }),
   );
 }
+
+/** Annulation d'une facture par avoir (AV-AAAA-NNNN). */
+export function useCreditNote() {
+  const queryClient = useQueryClient();
+  return useMutation(
+    orpc.invoices.creditNote.mutationOptions({
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.invoices.key() }),
+    }),
+  );
+}

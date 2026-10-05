@@ -4,7 +4,7 @@ import { z } from "zod";
 import { db } from "../database";
 import * as schema from "../database/schema";
 import { defaultPricingSettings, invalidatePricingConfig } from "../lib/settings";
-import { mailTrackingUpdate } from "../services/email";
+import { mailQuoteReceipt, mailTrackingUpdate } from "../services/email";
 import { adminOnly, authed } from "../middleware/auth";
 
 async function log(
@@ -125,6 +125,36 @@ export const admin = {
     .handler(async ({ input, context }) => {
       const [quote] = await db.select().from(schema.quotes).where(eq(schema.quotes.ref, input.ref)).limit(1);
       if (!quote) throw new ORPCError("NOT_FOUND", { message: "Commande introuvable" });
+
+      // Valider un devis « À valider » = l'envoyer au client (statut « nouveau » = devis envoyé).
+      // L'admin ne peut pas accepter à la place du client : seul le client confirme la commande.
+      const validation = input.decision === "accepte" && (quote.status === "a_valider" || quote.status === "nouveau");
+      if (validation) {
+        const validUntil = new Date(Date.now() + 15 * 86400000);
+        await db
+          .update(schema.quotes)
+          .set({ status: "nouveau", decision: "accepte", decisionReason: input.reason ?? null, decidedAt: new Date(), validUntil })
+          .where(eq(schema.quotes.id, quote.id));
+        if (quote.status === "a_valider") {
+          await mailQuoteReceipt({
+            to: quote.customerEmail,
+            name: quote.customerName,
+            firstName: quote.customerFirstName,
+            ref: quote.ref,
+            orderNumber: quote.orderNumber,
+            trackingNumber: quote.trackingNumber ?? "",
+            priceCents: quote.priceCents,
+            ttcCents: quote.priceTtcCents,
+            validUntil,
+            from: quote.fromAddress,
+            to_: quote.toAddress,
+            etaMin: quote.etaMin ?? 1,
+            etaMax: quote.etaMax ?? 5,
+          });
+        }
+        await log(context.user, "order.devis_envoye", quote.ref, input.reason ?? null);
+        return { ok: true };
+      }
 
       await db
         .update(schema.quotes)

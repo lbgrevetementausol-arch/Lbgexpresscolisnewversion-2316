@@ -13,7 +13,8 @@
     "preview": "bun run build && vite preview",
     "db:generate": "bun --env-file=../../.env drizzle-kit generate",
     "db:migrate": "bun --env-file=../../.env drizzle-kit migrate",
-    "db:push": "bun --env-file=../../.env drizzle-kit push"
+    "db:push": "bun --env-file=../../.env drizzle-kit push",
+    "test:devis": "bun --env-file=../../.env test src/tests/devis.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.66",

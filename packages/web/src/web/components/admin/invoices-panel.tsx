@@ -5,7 +5,7 @@ import { useI18n } from "../../lib/i18n";
 import { dateTime, moneyCents } from "../../lib/format";
 import { Card } from "../site/section";
 import { Field, Input } from "../site/field";
-import { useCreateInvoice, useInvoiceList, useSetInvoiceStatus } from "../../queries/invoices";
+import { useCreateInvoice, useCreditNote, useInvoiceList, useSetInvoiceStatus } from "../../queries/invoices";
 
 const FILTERS = ["tous", "en_attente_paiement", "payee", "annulee", "remboursee"] as const;
 type Filter = (typeof FILTERS)[number];
@@ -16,6 +16,7 @@ export function InvoicesPanel() {
   const [filter, setFilter] = useState<Filter>("tous");
   const list = useInvoiceList(filter, true);
   const setStatus = useSetInvoiceStatus();
+  const creditNote = useCreditNote();
   const create = useCreateInvoice();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
@@ -171,7 +172,11 @@ export function InvoicesPanel() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-lg font-bold">{moneyCents(invoice.totalCents, lang)}</span>
-                  {invoice.status === "payee" ? null : (
+                  {invoice.number.startsWith("AV-") ? (
+                    <span className="rounded-xl bg-surface-2 px-3 py-2 text-xs font-semibold">{t({ fr: "Avoir", en: "Credit note" })}</span>
+                  ) : (
+                  <>
+                  {invoice.status === "payee" || invoice.status === "annulee" ? null : (
                     <button
                       type="button"
                       disabled={setStatus.isPending}
@@ -203,12 +208,36 @@ export function InvoicesPanel() {
                     }
                     className="rounded-xl border border-border bg-surface-2 px-3 py-2 text-xs outline-none"
                   >
-                    {FILTERS.filter((f) => f !== "tous").map((f) => (
+                    {FILTERS.filter((f) => f !== "tous" && (f !== "annulee" || invoice.status === "annulee")).map((f) => (
                       <option key={f} value={f}>
                         {f}
                       </option>
                     ))}
                   </select>
+                  {invoice.status === "annulee" ? null : (
+                    <button
+                      type="button"
+                      disabled={creditNote.isPending}
+                      onClick={() => {
+                        const reason = window.prompt(
+                          t({
+                            fr: `Annuler ${invoice.number} par un avoir ? Motif :`,
+                            en: `Cancel ${invoice.number} with a credit note? Reason:`,
+                          }),
+                        );
+                        if (reason === null) return;
+                        creditNote.mutate(
+                          { number: invoice.number, reason: reason || undefined },
+                          { onSuccess: (r) => window.alert(`${t({ fr: "Avoir créé", en: "Credit note created" })} : ${r.number}`) },
+                        );
+                      }}
+                      className="rounded-xl bg-danger/15 px-3 py-2 text-xs font-semibold text-danger disabled:opacity-60"
+                    >
+                      {t({ fr: "Annuler par avoir", en: "Cancel with credit note" })}
+                    </button>
+                  )}
+                  </>
+                  )}
                 </div>
               </div>
             </div>

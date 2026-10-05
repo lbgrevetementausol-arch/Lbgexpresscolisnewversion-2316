@@ -101,7 +101,7 @@ export default function FacturePage() {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-              {t({ fr: "Facture", en: "Invoice" })}
+              {doc.number.startsWith("AV-") ? t({ fr: "Avoir", en: "Credit note" }) : t({ fr: "Facture", en: "Invoice" })}
             </p>
             <h1 className="mt-1 text-3xl font-extrabold">{doc.number}</h1>
           </div>
@@ -173,9 +173,9 @@ export default function FacturePage() {
               <thead>
                 <tr className="border-b border-border text-left text-xs uppercase tracking-[0.12em] text-muted">
                   <th className="py-3">{t({ fr: "Prestation", en: "Service" })}</th>
-                  <th className="py-3 text-right">{t({ fr: "Qté", en: "Qty" })}</th>
-                  <th className="py-3 text-right">{t({ fr: "PU HT", en: "Unit excl. VAT" })}</th>
-                  <th className="py-3 text-right">{t({ fr: "Total HT", en: "Total excl. VAT" })}</th>
+                  <th className="whitespace-nowrap py-3 pl-6 text-right">{t({ fr: "Qté", en: "Qty" })}</th>
+                  <th className="whitespace-nowrap py-3 pl-6 text-right">{t({ fr: "PU HT", en: "Unit excl. VAT" })}</th>
+                  <th className="whitespace-nowrap py-3 pl-6 text-right">{t({ fr: "Total HT", en: "Total excl. VAT" })}</th>
                 </tr>
               </thead>
               <tbody>
@@ -185,11 +185,11 @@ export default function FacturePage() {
                       <span className="font-medium">{item.label}</span>
                       {item.detail ? <span className="mt-1 block text-xs text-muted">{item.detail}</span> : null}
                     </td>
-                    <td className="py-3 text-right">
+                    <td className="whitespace-nowrap py-3 pl-6 text-right tabular-nums">
                       {item.quantity} {item.unit}
                     </td>
-                    <td className="py-3 text-right">{moneyCents(item.unitPriceCents, lang)}</td>
-                    <td className="py-3 text-right font-semibold">{moneyCents(item.totalCents, lang)}</td>
+                    <td className="whitespace-nowrap py-3 pl-6 text-right tabular-nums">{moneyCents(item.unitPriceCents, lang)}</td>
+                    <td className="whitespace-nowrap py-3 pl-6 text-right font-semibold tabular-nums">{moneyCents(item.totalCents, lang)}</td>
                   </tr>
                 ))}
               </tbody>

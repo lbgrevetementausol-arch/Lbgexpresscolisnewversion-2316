@@ -96,7 +96,9 @@ export function OrdersPanel() {
                 className="inline-flex items-center gap-1.5 rounded-xl bg-success/15 px-3 py-2 text-xs font-semibold text-success disabled:opacity-60"
               >
                 {decide.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
-                {t({ fr: "Accepter", en: "Accept" })}
+                {order.status === "a_valider"
+                  ? t({ fr: "Valider et envoyer le devis", en: "Approve and send quote" })
+                  : t({ fr: "Valider le devis", en: "Approve quote" })}
               </button>
               <button
                 type="button"

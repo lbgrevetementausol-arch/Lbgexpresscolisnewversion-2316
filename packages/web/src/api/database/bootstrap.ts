@@ -21,3 +21,17 @@ if (!existing?.count) {
   }
   console.log(`[database] base vide : ${SCHEMA_DDL.length} objets créés`);
 }
+
+// Colonnes ajoutées après coup : ajout idempotent (une base déjà peuplée n'est jamais recréée).
+const ADDED_COLUMNS: [string, string, string][] = [
+  ["quotes", "price_ttc_cents", "integer"],
+  ["quotes", "valid_until", "integer"],
+  ["quotes", "accepted_at", "integer"],
+];
+for (const [table, column, type] of ADDED_COLUMNS) {
+  const cols = await db.all<{ name: string }>(sql.raw(`PRAGMA table_info(\`${table}\`)`));
+  if (!cols.some((c) => c.name === column)) {
+    await db.run(sql.raw(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${type}`));
+    console.log(`[database] colonne ajoutée : ${table}.${column}`);
+  }
+}

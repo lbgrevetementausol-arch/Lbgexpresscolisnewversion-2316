@@ -33,15 +33,46 @@ export const TARIF = {
     /** Maritime groupage : forfait par carton standard (≈ 60 × 40 × 40 cm). */
     maritimeParCarton: 46.0,
   },
+  /**
+   * Grille déménagement — SEUL endroit à modifier pour changer les tarifs.
+   * Montants TTC (particuliers), pourcentages appliqués au prix de base.
+   */
   demenagement: {
-    /** Manutention, en € par m³. */
-    manutentionParM3: 15,
-    /** Transport, en € par km. */
-    transportParKm: 1.2,
-    /** Supplément par étage sans ascenseur, en € par étage et par m³. */
-    etageSansAscenseurParM3: 1.5,
-    /** Supplément portage long (> 30 m) ou stationnement contraint, en €. */
-    accesDifficile: 45,
+    /** Prix de base en € TTC par m³, selon la distance (borne haute incluse, en km). */
+    baseParM3: [
+      { maxKm: 30, prix: 34 },
+      { maxKm: 100, prix: 38 },
+      { maxKm: 300, prix: 48 },
+      { maxKm: 600, prix: 58 },
+      { maxKm: Number.POSITIVE_INFINITY, prix: 66 },
+    ],
+    /** +5 % par étage sans ascenseur et par adresse, plafonné à +25 % au total. */
+    etageSansAscenseurPct: 5,
+    etagesPlafondPct: 25,
+    /** Étage desservi par ascenseur : +2 % par adresse (fourchette 0–3 %). */
+    ascenseurPct: 2,
+    /** Accès difficile (portage > 30 m, rue piétonne, stationnement impossible). */
+    accesDifficilePct: 10,
+    /** Emballage / fourniture des cartons, en € TTC par m³. */
+    emballageParM3: 12,
+    /** Objets lourds : forfait en € TTC par objet. */
+    objetsLourds: [
+      { id: "piano-droit", label: { fr: "Piano droit", en: "Upright piano" }, prix: 150 },
+      { id: "piano-queue", label: { fr: "Piano à queue", en: "Grand piano" }, prix: 350 },
+      { id: "coffre-fort", label: { fr: "Coffre-fort", en: "Safe" }, prix: 120 },
+      { id: "frigo-americain", label: { fr: "Réfrigérateur américain", en: "American fridge" }, prix: 60 },
+      { id: "meuble-massif", label: { fr: "Meuble massif (> 100 kg)", en: "Heavy furniture (> 100 kg)" }, prix: 60 },
+    ],
+    /** Haute saison (juin–sept., fin de mois ≥ 25, vendredi–samedi) : +10 à 15 %. */
+    hauteSaisonPct: 12,
+    /** Basse saison (oct.–mars, du mardi au jeudi, hors fin de mois) : −5 %. */
+    basseSaisonPct: -5,
+    /** Minimum de facturation, en € TTC. */
+    minimumTtc: 390,
+    /** Densité moyenne pour estimer le poids (choix du véhicule uniquement). */
+    kgParM3: 200,
+    /** Visite technique : gratuite au-delà de ce volume ; en dessous, sur demande (non tarifée ici). */
+    visiteGratuiteDesM3: 30,
   },
 } as const;
 
@@ -97,7 +128,57 @@ export type DevisOptions = {
   etagesSansAscenseur?: number;
   /** Portage long ou stationnement contraint d'un côté au moins (déménagement). */
   accesDifficile?: boolean;
+  /** Détail par adresse (déménagement). Prioritaire sur `etagesSansAscenseur`. */
+  etageDepart?: number;
+  etageArrivee?: number;
+  ascenseurDepart?: boolean;
+  ascenseurArrivee?: boolean;
+  emballage?: boolean;
+  objetsLourds?: string[];
+  /** Date souhaitée AAAA-MM-JJ (saisonnalité). */
+  date?: string;
 };
+
+export type Saison = "haute" | "basse" | "normale";
+
+/** Saison tarifaire d'une date AAAA-MM-JJ (vide ou invalide = normale). */
+export function saisonDe(date?: string): Saison {
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return "normale";
+  const d = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return "normale";
+  const mois = d.getMonth() + 1;
+  const jour = d.getDate();
+  const js = d.getDay(); // 0 dimanche … 6 samedi
+  if ((mois >= 6 && mois <= 9) || jour >= 25 || js === 5 || js === 6) return "haute";
+  if ((mois >= 10 || mois <= 3) && js >= 2 && js <= 4) return "basse";
+  return "normale";
+}
+
+/**
+ * Garde-fous : un devis hors norme passe « À valider » (aucun mail client automatique).
+ * > 2 500 € TTC, prix au m³ hors 25–100 € (déménagement), ou écart > 15 % entre le
+ * prix affiché au navigateur et le calcul serveur.
+ */
+export const GARDE_FOUS = { maxTtc: 2500, minParM3: 25, maxParM3: 100, ecartMax: 0.15 } as const;
+export function needsReview(args: { totalTtc: number; volumeM3?: number; clientTotal?: number; demenagement: boolean }): boolean {
+  const g = GARDE_FOUS;
+  const perM3 = args.demenagement && (args.volumeM3 ?? 0) > 0 ? args.totalTtc / (args.volumeM3 as number) : null;
+  const ecart = args.clientTotal ? Math.abs(args.clientTotal - args.totalTtc) / args.totalTtc : 0;
+  return args.totalTtc > g.maxTtc || ecart > g.ecartMax || (perM3 !== null && (perM3 < g.minParM3 || perM3 > g.maxParM3));
+}
+
+/** Prix de base au m³ pour une distance donnée. */
+export function baseParM3(km: number): number {
+  return TARIF.demenagement.baseParM3.find((t) => km <= t.maxKm)?.prix ?? 66;
+}
+
+/** Véhicule conseillé d'après le volume (poids estimé, jamais demandé au client). */
+export function vehiculeConseille(vol: number): { poidsKg: number; vehicule: string } {
+  const poidsKg = Math.round(vol * TARIF.demenagement.kgParM3);
+  const vehicule =
+    vol <= 12 ? "Fourgon 12 m³" : vol <= 20 ? "Camion 20 m³" : vol <= 30 ? "Porteur 30 m³" : vol <= 50 ? "Porteur 50 m³" : "Semi-remorque / plusieurs véhicules";
+  return { poidsKg, vehicule };
+}
 
 /** Prix TTC final, arrondi en X,99 €. */
 export function calculateurDevis(typeService: TypeService, options: DevisOptions): number {
@@ -117,6 +198,10 @@ export type DevisDetaille = {
   plancher: boolean;
   /** Vrai quand le montant doit être présenté comme une estimation à confirmer. */
   estimation: boolean;
+  /** Déménagement : saison appliquée, poids estimé, véhicule conseillé. */
+  saison?: Saison;
+  poidsEstimeKg?: number;
+  vehicule?: string;
 };
 
 /** Calcul complet, avec le détail ligne par ligne affiché dans le récapitulatif. */
@@ -210,54 +295,102 @@ export function devisDetaille(typeService: TypeService, options: DevisOptions): 
     }
   }
 
+  let saison: Saison | undefined;
+  let poidsEstimeKg: number | undefined;
+  let vehicule: string | undefined;
+  let minimumDem = 0;
+
   if (typeService === "demenagement") {
     const d = TARIF.demenagement;
     const vol = options.volumeM3 || 0;
     const km = options.distance || 0;
-    const manutention = vol * d.manutentionParM3;
-    const transport = km * d.transportParKm;
-    const etages = Math.max(0, options.etagesSansAscenseur || 0);
-    const portage = etages * vol * d.etageSansAscenseurParM3;
-    const acces = options.accesDifficile ? d.accesDifficile : 0;
-    brut = manutention + transport + portage + acces;
-    lines.push(
-      {
-        key: "manutention",
-        label: { fr: `Manutention (${vol} m³)`, en: `Handling (${vol} m³)` },
-        amount: centimes(manutention),
+    const prixM3 = baseParM3(km);
+    const base = vol * prixM3;
+    lines.push({
+      key: "base",
+      label: {
+        fr: `Base ${vol} m³ × ${prixM3} € (≈ ${Math.round(km)} km)`,
+        en: `Base ${vol} m³ × €${prixM3} (≈ ${Math.round(km)} km)`,
       },
-      {
-        key: "transport",
-        label: {
-          fr: `Transport routier (${Math.round(km)} km)`,
-          en: `Road transport (${Math.round(km)} km)`,
-        },
-        amount: centimes(transport),
-      },
-    );
-    if (portage > 0) {
+      amount: centimes(base),
+    });
+
+    const detail = options.etageDepart !== undefined || options.etageArrivee !== undefined;
+    const adresses = detail
+      ? [
+          { etage: options.etageDepart ?? 0, asc: options.ascenseurDepart ?? false },
+          { etage: options.etageArrivee ?? 0, asc: options.ascenseurArrivee ?? false },
+        ]
+      : [{ etage: Math.max(0, options.etagesSansAscenseur || 0), asc: false }];
+    const etagesSans = adresses.reduce((n, a) => n + (a.asc ? 0 : Math.max(0, a.etage)), 0);
+    const nbAsc = adresses.filter((a) => a.asc && a.etage > 0).length;
+    const pctEtages = Math.min(d.etagesPlafondPct, etagesSans * d.etageSansAscenseurPct);
+    if (pctEtages > 0) {
       lines.push({
-        key: "portage",
+        key: "etages",
         label: {
-          fr: `Portage sans ascenseur (${etages} étage${etages > 1 ? "s" : ""})`,
-          en: `Stair carry (${etages} floor${etages > 1 ? "s" : ""})`,
+          fr: `Étages sans ascenseur (${etagesSans}) +${pctEtages} %`,
+          en: `Floors without elevator (${etagesSans}) +${pctEtages}%`,
         },
-        amount: centimes(portage),
+        amount: centimes((base * pctEtages) / 100),
       });
     }
-    if (acces > 0) {
+    if (nbAsc > 0) {
+      const pct = nbAsc * d.ascenseurPct;
+      lines.push({
+        key: "ascenseur",
+        label: { fr: `Étage avec ascenseur +${pct} %`, en: `Floor with elevator +${pct}%` },
+        amount: centimes((base * pct) / 100),
+      });
+    }
+    if (options.accesDifficile) {
       lines.push({
         key: "acces",
-        label: { fr: "Accès difficile / portage long", en: "Difficult access / long carry" },
-        amount: centimes(acces),
+        label: { fr: `Accès difficile +${d.accesDifficilePct} %`, en: `Difficult access +${d.accesDifficilePct}%` },
+        amount: centimes((base * d.accesDifficilePct) / 100),
       });
     }
+    if (options.emballage) {
+      lines.push({
+        key: "emballage",
+        label: { fr: `Emballage / cartons (${vol} m³ × ${d.emballageParM3} €)`, en: `Packing (${vol} m³ × €${d.emballageParM3})` },
+        amount: centimes(vol * d.emballageParM3),
+      });
+    }
+    for (const id of options.objetsLourds ?? []) {
+      const o = d.objetsLourds.find((x) => x.id === id);
+      if (o) lines.push({ key: `objet-${o.id}`, label: o.label, amount: o.prix });
+    }
+    const avantSaison = lines.reduce((sum, l) => sum + l.amount, 0);
+    saison = saisonDe(options.date);
+    const pctSaison = saison === "haute" ? d.hauteSaisonPct : saison === "basse" ? d.basseSaisonPct : 0;
+    if (pctSaison !== 0) {
+      lines.push({
+        key: "saison",
+        label:
+          saison === "haute"
+            ? { fr: `Haute saison +${pctSaison} %`, en: `Peak season +${pctSaison}%` }
+            : { fr: `Basse saison ${pctSaison} %`, en: `Off-peak ${pctSaison}%` },
+        amount: centimes((avantSaison * pctSaison) / 100),
+      });
+    }
+    brut = lines.reduce((sum, l) => sum + l.amount, 0);
+    ({ poidsKg: poidsEstimeKg, vehicule } = vehiculeConseille(vol));
+    minimumDem = d.minimumTtc;
     etaDays = [1, 5];
     estimation = true;
   }
 
   let total = appliquerTarifStrategique(brut);
-  if (typeService === "covoiturage" && total < TARIF.covoiturage.prixMinimum) {
+  if (minimumDem > 0 && total < minimumDem) {
+    lines.push({
+      key: "minimum",
+      label: { fr: `Minimum de facturation (${minimumDem} €)`, en: `Minimum charge (€${minimumDem})` },
+      amount: centimes(minimumDem - brut),
+    });
+    total = minimumDem;
+    plancher = true;
+  } else if (typeService === "covoiturage" && total < TARIF.covoiturage.prixMinimum) {
     total = TARIF.covoiturage.prixMinimum;
     plancher = true;
     lines.push({
@@ -276,7 +409,7 @@ export function devisDetaille(typeService: TypeService, options: DevisOptions): 
     }
   }
 
-  return { total, brut: centimes(brut), lines, etaDays, plancher, estimation };
+  return { total, brut: centimes(brut), lines, etaDays, plancher, estimation, saison, poidsEstimeKg, vehicule };
 }
 
 const R = 6371; // rayon terrestre moyen, en km

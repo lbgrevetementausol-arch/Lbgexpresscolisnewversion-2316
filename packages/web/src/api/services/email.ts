@@ -117,7 +117,13 @@ export async function mailQuoteReceipt(args: {
   ref: string;
   orderNumber?: string | null;
   trackingNumber: string;
+  /** Montant HT en centimes (source en base). */
   priceCents: number;
+  /** Montant TTC figé au devis ; à défaut HT × 1,2. */
+  ttcCents?: number | null;
+  /** Détail TTC ligne par ligne (en euros), tel qu'affiché au client. */
+  lines?: { label: string; amount: number }[];
+  validUntil?: Date | null;
   from: string;
   to_: string;
   etaMin: number;
@@ -126,25 +132,34 @@ export async function mailQuoteReceipt(args: {
 }) {
   const prenom = args.firstName?.trim() || args.name;
   const numero = args.orderNumber ?? args.ref;
+  const ttc = args.ttcCents ?? Math.round(args.priceCents * 1.2);
+  const validite = args.validUntil
+    ? args.validUntil.toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })
+    : "15 jours";
+  const detail = args.lines?.length
+    ? `<p style="margin:16px 0 0"><strong>Détail (TTC)</strong></p>` +
+      table(args.lines.map((l) => row(l.label, euro(Math.round(l.amount * 100)))).join(""))
+    : "";
   const html = layout(
     `Votre devis LBG Express Colis${args.orderNumber ? ` n° ${args.orderNumber}` : ""}`,
     `<p>Bonjour ${esc(prenom)},</p>
-     <p>Merci de votre confiance. Voici votre devis, à conserver. Il est valable 15 jours.</p>
+     <p>Voici votre devis. Il est valable jusqu'au ${esc(validite)}. <strong>Votre commande n'est confirmée qu'après votre acceptation du devis.</strong></p>
      ${table(
-       row("Numéro de commande", numero) +
+       row("Numéro de devis", numero) +
          row("Référence dossier", args.ref) +
          row("Prestation", args.serviceLabel) +
-         row("Enlèvement", args.from) +
-         row("Livraison", args.to_) +
+         row("Départ", args.from) +
+         row("Arrivée", args.to_) +
          row("Délai estimé", `${args.etaMin} à ${args.etaMax} jours ouvrés`) +
-         row("Montant TTC", euro(Math.round(args.priceCents * 1.2))) +
+         row("Montant TTC", euro(ttc)) +
          row("dont HT", euro(args.priceCents)) +
-         row("N° de suivi", args.trackingNumber),
+         row("dont TVA 20 %", euro(ttc - args.priceCents)),
      )}
-     <p><strong>La suite :</strong> notre équipe vérifie la faisabilité de l'enlèvement et vous rappelle sous 2 heures ouvrées au numéro que vous nous avez laissé. Le règlement se fait depuis votre espace de paiement sécurisé, et l'enlèvement est planifié dès confirmation.</p>
-     <p>Pour toute question, rappelez simplement votre numéro de commande <strong>${esc(numero)}</strong> — par téléphone au ${esc(ISSUER.phone)}, sur WhatsApp ou par retour d'e-mail.</p>
+     ${detail}
+     <p>Prix ferme sous réserve que le volume, les étages et les accès soient conformes à votre déclaration.</p>
+     <p><strong>La suite :</strong> acceptez le devis avec le bouton ci-dessous, puis réglez depuis votre espace de paiement sécurisé. Pour toute question, rappelez votre numéro <strong>${esc(numero)}</strong> — par téléphone au ${esc(ISSUER.phone)}, sur WhatsApp ou par retour d'e-mail.</p>
      <p>À très vite,<br />L'équipe LBG Express Colis</p>`,
-    { label: `Voir ma commande n° ${numero}`, href: `${SITE}/paiement/${encodeURIComponent(args.ref)}` },
+    { label: "Consulter et accepter mon devis", href: `${SITE}/paiement/${encodeURIComponent(args.ref)}` },
   );
   return sendEmail({
     to: args.to,
@@ -153,6 +168,42 @@ export async function mailQuoteReceipt(args: {
       : `Devis ${args.ref} — LBG Express Colis`,
     html,
   });
+}
+
+/** 1 bis. Devis accepté par le client : confirmation de commande + alerte interne. */
+export async function mailQuoteAccepted(args: {
+  to: string;
+  name: string;
+  firstName?: string | null;
+  ref: string;
+  orderNumber?: string | null;
+  ttcCents: number;
+  serviceLabel?: string | null;
+}) {
+  const prenom = args.firstName?.trim() || args.name;
+  const numero = args.orderNumber ?? args.ref;
+  const client = layout(
+    `Commande confirmée n° ${numero}`,
+    `<p>Bonjour ${esc(prenom)},</p>
+     <p>Vous avez accepté le devis <strong>${esc(numero)}</strong> (${esc(euro(args.ttcCents))} TTC). Votre commande est confirmée.</p>
+     <p>Il ne reste qu'à régler depuis votre espace de paiement sécurisé ; notre équipe vous recontacte pour planifier la prestation.</p>
+     <p>L'équipe LBG Express Colis</p>`,
+    { label: "Accéder au paiement", href: `${SITE}/paiement/${encodeURIComponent(args.ref)}` },
+  );
+  const ops = layout(
+    `Devis accepté — n° ${numero}`,
+    `<p>Le client a accepté son devis.</p>` +
+      table(
+        row("Client", args.name) +
+          row("E-mail", args.to) +
+          row("Référence", args.ref) +
+          row("Prestation", args.serviceLabel) +
+          row("Montant TTC", euro(args.ttcCents)),
+      ),
+    { label: "Ouvrir le back-office", href: `${SITE}/admin` },
+  );
+  await sendEmail({ to: OPS, subject: `Devis accepté n° ${numero} — ${args.name}`, html: ops });
+  return sendEmail({ to: args.to, subject: `Commande confirmée n° ${numero} — LBG Express Colis`, html: client });
 }
 
 /** 2. Notification interne : nouvelle commande reçue. */

@@ -55,8 +55,39 @@ export function trackEvent(name: string, params: Params = {}) {
   }
 }
 
-/** Demande de devis envoyée. */
+/**
+ * Trafic interne (équipe LBG) : ouvrir une fois le site avec ?internal=1 marque le
+ * navigateur (localStorage), ?internal=0 le démarque. Les événements portent alors
+ * traffic_type="internal" (filtrable dans GTM/GA4) et ne partent ni vers Meta ni vers Ads.
+ */
+export function isInternalTraffic(): boolean {
+  const w = win();
+  if (!w) return false;
+  try {
+    const flag = new URLSearchParams(w.location.search).get("internal");
+    if (flag === "1") w.localStorage.setItem("lbg_internal", "1");
+    if (flag === "0") w.localStorage.removeItem("lbg_internal");
+    return w.localStorage.getItem("lbg_internal") === "1" || w.location.pathname.startsWith("/admin");
+  } catch {
+    return false;
+  }
+}
+
+/** Étape du tunnel devis : push dataLayer uniquement (GTM décide quoi en faire). */
+export function trackFunnel(name: string, params: Params = {}) {
+  const w = win();
+  if (!w) return;
+  try {
+    (w.dataLayer ??= []).push({ event: name, traffic_type: isInternalTraffic() ? "internal" : "external", ...params });
+  } catch {
+    /* tag bloqué */
+  }
+}
+
+/** Demande de devis envoyée (appelé APRÈS la réponse serveur, valeur = prix enregistré). */
 export function trackLead(params: Params = {}) {
+  trackFunnel("generate_lead", { currency: "EUR", quote_id: params.ref, ...params });
+  if (isInternalTraffic()) return;
   trackEvent("Lead", { currency: "EUR", ...params });
   // Valeur réelle du devis quand elle est connue, sinon 1.0 comme valeur par défaut.
   trackAdsConversion(ADS_LEAD_CONVERSION, {
@@ -83,4 +114,23 @@ export function trackPurchase(params: Params = {}) {
 export function trackContact(params: Params = {}) {
   trackEvent("Contact", params);
   trackAdsConversion(ADS_LEAD_CONVERSION, { value: 1.0 });
+}
+
+// Clics téléphone / WhatsApp, partout sur le site (une seule écoute globale).
+if (typeof document !== "undefined") {
+  const w = window as TagWindow & { __lbgClickTracking?: boolean };
+  if (!w.__lbgClickTracking) {
+    w.__lbgClickTracking = true;
+    document.addEventListener(
+      "click",
+      (e) => {
+        const a = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+        if (!a) return;
+        const href = a.getAttribute("href") ?? "";
+        if (href.startsWith("tel:")) trackFunnel("click_phone", { page: location.pathname });
+        else if (/wa\.me|whatsapp\.com/.test(href)) trackFunnel("click_whatsapp", { page: location.pathname });
+      },
+      { capture: true },
+    );
+  }
 }

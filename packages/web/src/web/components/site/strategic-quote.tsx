@@ -47,7 +47,29 @@ export function useRoute() {
     setKmAuto(false);
   }, []);
 
-  return { from, to, km, kmAuto, onFrom, onTo, setKmManual, setFrom, setTo };
+  // Saisie libre d'une adresse : la distance auto-calculée n'est plus fiable → on l'efface.
+  const typeFrom = useCallback(
+    (p: PlacePoint) => {
+      setFrom(p);
+      if (kmAuto) {
+        setKm("");
+        setKmAuto(false);
+      }
+    },
+    [kmAuto],
+  );
+  const typeTo = useCallback(
+    (p: PlacePoint) => {
+      setTo(p);
+      if (kmAuto) {
+        setKm("");
+        setKmAuto(false);
+      }
+    },
+    [kmAuto],
+  );
+
+  return { from, to, km, kmAuto, onFrom, onTo, setKmManual, setFrom: typeFrom, setTo: typeTo };
 }
 
 export const toNumber = (v: string) => Number(v.replace(",", ".")) || 0;
@@ -94,8 +116,8 @@ export function DistanceField({
       hint={
         kmAuto
           ? t({
-              fr: "Calculée depuis les deux villes. Corrigez si votre trajet réel diffère.",
-              en: "Computed from both cities. Adjust it if your actual route differs.",
+              fr: `≈ ${km} km estimés depuis les deux villes. Corrigez si votre trajet réel diffère.`,
+              en: `≈ ${km} km estimated from both cities. Adjust it if your actual route differs.`,
             })
           : t({
               fr: "Choisissez les villes dans les suggestions pour le remplissage automatique, ou saisissez la distance.",
@@ -105,8 +127,9 @@ export function DistanceField({
     >
       <Input
         type="number"
-        min={0}
+        min={1}
         max={5000}
+        inputMode="numeric"
         value={km}
         onChange={(e) => onChange(e.target.value)}
         placeholder={t({ fr: "Calculée automatiquement", en: "Filled automatically" })}
@@ -202,6 +225,7 @@ export function PricePanel({
         <>
           <p className="mt-2 font-display text-[2.6rem] font-extrabold leading-none text-primary">
             {money(result.total, lang)}
+            <span className="ml-2 align-middle text-base font-semibold text-muted">{t({ fr: "TTC", en: "incl. VAT" })}</span>
           </p>
           <p className="mt-2 flex items-center gap-1.5 text-sm text-muted">
             <Clock className="size-4 text-primary" />
@@ -218,16 +242,16 @@ export function PricePanel({
           {result.plancher ? (
             <p className="mt-4 text-xs text-muted">
               {t({
-                fr: "Tarif minimum appliqué : 8,99 € pour les trajets courts.",
-                en: "Minimum fare applied: €8.99 on short runs.",
+                fr: `Tarif minimum appliqué : ${money(result.total, lang)} TTC.`,
+                en: `Minimum fare applied: ${money(result.total, lang)} incl. VAT.`,
               })}
             </p>
           ) : null}
           {result.estimation ? (
             <p className="mt-4 text-xs text-muted">
               {t({
-                fr: "Estimation ferme sous réserve de la visite technique (gratuite au-delà de 30 m³).",
-                en: "Firm estimate subject to the technical survey (free above 30 m³).",
+                fr: "Prix ferme sous réserve que le volume et les accès soient conformes à votre déclaration. Visite technique gratuite au-delà de 30 m³ ; en dessous, sur demande.",
+                en: "Firm price provided the volume and access match your description. Free technical survey above 30 m³; below that, on request.",
               })}
             </p>
           ) : null}
@@ -250,8 +274,8 @@ export function PricePanel({
           <p className="mt-4 flex items-start gap-2 text-xs text-muted">
             <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" />
             {t({
-              fr: "Aucun prélèvement à cette étape. Numéro de suivi envoyé dès la validation.",
-              en: "No charge at this step. Tracking number sent as soon as you confirm.",
+              fr: "Aucun prélèvement à cette étape. Vous recevez votre devis par e-mail, à accepter avant tout paiement.",
+              en: "No charge at this step. You receive your quote by email, to accept before any payment.",
             })}
           </p>
         </>

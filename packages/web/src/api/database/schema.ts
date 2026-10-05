@@ -33,6 +33,12 @@ export const quotes = sqliteTable("quotes", {
   goodsDescription: text("goods_description"),
   message: text("message"),
   priceCents: integer("price_cents").notNull(),
+  /** Montant TTC figé au moment du devis (centimes) — jamais recalculé. */
+  priceTtcCents: integer("price_ttc_cents"),
+  /** Fin de validité du devis (15 jours). */
+  validUntil: integer("valid_until", { mode: "timestamp" }),
+  /** Acceptation explicite du devis par le client. */
+  acceptedAt: integer("accepted_at", { mode: "timestamp" }),
   breakdown: text("breakdown"),
   etaMin: integer("eta_min"),
   etaMax: integer("eta_max"),

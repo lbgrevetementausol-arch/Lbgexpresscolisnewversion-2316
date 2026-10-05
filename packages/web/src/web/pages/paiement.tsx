@@ -6,7 +6,92 @@ import { Section } from "../components/site/section";
 import { Card } from "../components/site/section";
 import { PageHero } from "../components/site/layout";
 import { PayButton, TransferNotice } from "../components/site/pay-button";
-import { useQuote } from "../queries/quotes";
+import { useState } from "react";
+import { useAcceptQuote, useQuote } from "../queries/quotes";
+import { trackFunnel } from "../lib/pixels";
+
+const ACCEPTED = ["accepte", "paye", "en_cours", "livre"];
+
+/** Acceptation explicite du devis : obligatoire avant tout paiement. */
+function AcceptQuote({
+  reference,
+  status,
+  expired,
+  ttcCents,
+  onDone,
+}: {
+  reference: string;
+  status: string;
+  expired: boolean;
+  ttcCents: number;
+  onDone: () => void;
+}) {
+  const { t, lang } = useI18n();
+  const [checked, setChecked] = useState(false);
+  const accept = useAcceptQuote();
+  if (status === "a_valider") {
+    return (
+      <p className="rounded-xl border border-border bg-surface-2/60 p-4 text-sm text-muted">
+        {t({
+          fr: "Votre demande est en cours de vérification par notre équipe. Nous vous recontactons avec votre devis définitif.",
+          en: "Our team is reviewing your request. We will get back to you with your final quote.",
+        })}
+      </p>
+    );
+  }
+  if (status !== "nouveau" || expired) {
+    return (
+      <p className="rounded-xl border border-border bg-surface-2/60 p-4 text-sm text-muted">
+        {expired
+          ? t({ fr: "Ce devis a expiré (validité 15 jours). Demandez un nouveau devis.", en: "This quote has expired (15-day validity). Please request a new one." })
+          : t({ fr: "Ce devis n'est plus valable.", en: "This quote is no longer valid." })}
+      </p>
+    );
+  }
+  return (
+    <div className="grid gap-3">
+      <label className="flex cursor-pointer items-start gap-3 text-sm">
+        <input
+          type="checkbox"
+            className="mt-1 size-4 accent-[var(--primary)]"
+            aria-label="Accepter le devis"
+          checked={checked}
+          onChange={(e) => setChecked(e.target.checked)}
+        />
+        <span>
+          {t({
+            fr: `J'accepte ce devis de ${moneyCents(ttcCents, lang)} TTC, prix ferme sous réserve que le volume et les accès soient conformes à ma déclaration.`,
+            en: `I accept this quote of ${moneyCents(ttcCents, lang)} incl. VAT, firm price provided the volume and access match my description.`,
+          })}
+        </span>
+      </label>
+      <button
+        type="button"
+        disabled={!checked || accept.isPending}
+        onClick={() =>
+          accept.mutate(
+            { ref: reference, accept: true },
+            {
+              onSuccess: (r) => {
+                if (!r.already) trackFunnel("quote_accepted", { value: ttcCents / 100, currency: "EUR", quote_id: reference });
+                onDone();
+              },
+            },
+          )
+        }
+        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3.5 font-semibold text-primary-foreground transition hover:bg-primary-strong disabled:opacity-50"
+      >
+        {accept.isPending ? <Loader2 className="size-5 animate-spin" /> : t({ fr: "Accepter le devis", en: "Accept the quote" })}
+      </button>
+      {accept.isError ? (
+        <p className="flex items-start gap-2 text-sm text-danger">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          {accept.error instanceof Error ? accept.error.message : t({ fr: "Erreur, réessayez.", en: "Error, please retry." })}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 export default function PaiementPage() {
   const { t, lang } = useI18n();
@@ -73,13 +158,17 @@ export default function PaiementPage() {
       <PageHero
         eyebrow={
           q.orderNumber
-            ? t({ fr: `Commande n° ${q.orderNumber}`, en: `Order no. ${q.orderNumber}` })
+            ? ACCEPTED.includes(q.status)
+              ? t({ fr: `Commande n° ${q.orderNumber}`, en: `Order no. ${q.orderNumber}` })
+              : t({ fr: `Devis n° ${q.orderNumber}`, en: `Quote no. ${q.orderNumber}` })
             : t({ fr: `Devis ${q.ref}`, en: `Quote ${q.ref}` })
         }
         title={
           paid
             ? t({ fr: "Commande enregistrée", en: "Order recorded" })
-            : t({ fr: "Réglez votre expédition", en: "Pay for your shipment" })
+            : ACCEPTED.includes(q.status)
+              ? t({ fr: "Réglez votre commande", en: "Pay for your order" })
+              : t({ fr: "Votre devis", en: "Your quote" })
         }
         lead={
           paid
@@ -88,8 +177,8 @@ export default function PaiementPage() {
                 en: "Your tracking number is live: you and your recipient can follow the parcel in real time.",
               })
             : t({
-                fr: "Le prix est ferme. Choisissez votre moyen de paiement, l'enlèvement est planifié dès confirmation.",
-                en: "The price is firm. Pick your payment method — pickup is scheduled as soon as it's confirmed.",
+                fr: "Acceptez le devis (valable 15 jours) puis choisissez votre moyen de paiement ; la prestation est planifiée dès confirmation.",
+                en: "Accept the quote (valid 15 days), then pick your payment method; the service is scheduled once confirmed.",
               })
         }
       />
@@ -182,15 +271,21 @@ export default function PaiementPage() {
                 </p>
 
                 <div className="mt-6 grid gap-4">
+                  {!ACCEPTED.includes(q.status) ? (
+                    <AcceptQuote reference={q.ref} status={q.status} expired={q.expired} ttcCents={q.priceTtcCents} onDone={() => quote.refetch()} />
+                  ) : (
+                  <>
                   <PayButton
                     target={{ quoteRef: q.ref }}
                     label={t({
-                      fr: `Payer ${moneyCents(Math.round(q.priceCents * 1.2), lang)} par carte`,
-                      en: `Pay ${moneyCents(Math.round(q.priceCents * 1.2), lang)} by card`,
+                      fr: `Payer ${moneyCents(q.priceTtcCents, lang)} par carte`,
+                      en: `Pay ${moneyCents(q.priceTtcCents, lang)} by card`,
                     })}
                     className="w-full py-3.5"
                   />
                   <TransferNotice />
+                  </>
+                  )}
                 </div>
 
                 <p className="mt-4 flex items-center justify-center gap-2 text-xs text-muted">
@@ -271,7 +366,7 @@ export default function PaiementPage() {
             <div className="mt-5 flex items-baseline justify-between border-t border-border pt-5">
               <span className="text-sm text-muted">{t({ fr: "Total TTC", en: "Total incl. VAT" })}</span>
               <span className="font-display text-3xl font-extrabold text-primary">
-                {moneyCents(Math.round(q.priceCents * 1.2), lang)}
+                {moneyCents(q.priceTtcCents, lang)}
               </span>
             </div>
 

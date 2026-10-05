@@ -1,4 +1,5 @@
-import { desc, like } from "drizzle-orm";
+import { ORPCError } from "@orpc/server";
+import { desc, eq, like } from "drizzle-orm";
 import { db } from "../database";
 import * as schema from "../database/schema";
 
@@ -24,9 +25,9 @@ export function myposUrl() {
 }
 
 /** Numérotation séquentielle FA-AAAA-NNNN, sans trou dans l'année en cours. */
-export async function nextInvoiceNumber(now = new Date()) {
+export async function nextInvoiceNumber(now = new Date(), kind = "FA") {
   const year = now.getFullYear();
-  const prefix = `FA-${year}-`;
+  const prefix = `${kind}-${year}-`;
   const rows = await db
     .select({ number: schema.invoices.number })
     .from(schema.invoices)
@@ -93,6 +94,8 @@ export interface CreateInvoiceArgs {
   locale?: "fr" | "en";
   vatRate?: number;
   dueInDays?: number;
+  /** « FA » pour une facture, « AV » pour un avoir (numérotation séparée). */
+  numberPrefix?: "FA" | "AV";
 }
 
 /** Crée une facture pro numérotée + ses lignes, et renvoie le document complet. */
@@ -100,7 +103,21 @@ export async function createInvoice(args: CreateInvoiceArgs) {
   const now = new Date();
   const vatRate = args.vatRate ?? VAT_RATE;
   const { lines, subtotalCents, vatCents, totalCents } = totalsFor(args.items, vatRate);
-  const number = await nextInvoiceNumber(now);
+  // Garde-fou central (toutes les voies : paiement, back-office) : une facture liée à un
+  // devis reprend EXACTEMENT le montant HT du devis accepté. Seul l'avoir y déroge.
+  if (args.quoteRef && args.numberPrefix !== "AV") {
+    const [quote] = await db
+      .select({ priceCents: schema.quotes.priceCents })
+      .from(schema.quotes)
+      .where(eq(schema.quotes.ref, args.quoteRef))
+      .limit(1);
+    if (quote && subtotalCents !== quote.priceCents) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: `Montant facture (${(subtotalCents / 100).toFixed(2)} € HT) différent du devis accepté (${(quote.priceCents / 100).toFixed(2)} € HT).`,
+      });
+    }
+  }
+  const number = await nextInvoiceNumber(now, args.numberPrefix ?? "FA");
 
   const [invoice] = await db
     .insert(schema.invoices)
@@ -118,7 +135,7 @@ export async function createInvoice(args: CreateInvoiceArgs) {
       vatRate,
       vatCents,
       totalCents,
-      status: "en_attente_paiement",
+      status: args.numberPrefix === "AV" ? "avoir" : "en_attente_paiement",
       notes: args.notes ?? null,
       locale: args.locale ?? "fr",
       dueAt: new Date(now.getTime() + (args.dueInDays ?? 14) * 86400000),

@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import { base } from "../__core/app";
 import { db } from "../database";
@@ -120,6 +120,9 @@ export const invoices = {
           .where(eq(schema.quotes.ref, input.quoteRef))
           .limit(1);
         if (!quote) throw new ORPCError("NOT_FOUND", { message: "Commande introuvable" });
+        if (!["accepte", "paye", "en_cours", "livre"].includes(quote.status)) {
+          throw new ORPCError("FORBIDDEN", { message: "Acceptez d'abord le devis avant le paiement." });
+        }
 
         const [existing] = await db
           .select()
@@ -357,6 +360,60 @@ export const invoices = {
       return invoice;
     }),
 
+  /**
+   * Annulation par avoir : on ne supprime jamais une facture émise. L'avoir
+   * (AV-AAAA-NNNN) reprend les lignes en négatif et la facture passe « annulée ».
+   */
+  creditNote: adminOnly
+    .input(z.object({ number: z.string().min(4).max(40), reason: z.string().max(500).optional() }))
+    .handler(async ({ input, context }) => {
+      const { invoice, items } = await loadInvoice(input.number);
+      if (invoice.number.startsWith("AV-")) throw new ORPCError("BAD_REQUEST", { message: "Un avoir ne s'annule pas." });
+      // Verrou : la facture passe « annulée » AVANT l'avoir ; un second clic simultané échoue ici.
+      const claimed = await db
+        .update(schema.invoices)
+        .set({ status: "annulee", updatedAt: new Date() })
+        .where(and(eq(schema.invoices.id, invoice.id), ne(schema.invoices.status, "annulee")))
+        .returning({ id: schema.invoices.id });
+      if (claimed.length === 0) throw new ORPCError("CONFLICT", { message: "Facture déjà annulée." });
+      const { invoice: avoir } = await createInvoice({
+        numberPrefix: "AV",
+        quoteRef: invoice.quoteRef,
+        userId: invoice.userId,
+        customerName: invoice.customerName,
+        customerEmail: invoice.customerEmail,
+        customerPhone: invoice.customerPhone,
+        customerCompany: invoice.customerCompany,
+        customerAddress: invoice.customerAddress,
+        subject: `Avoir sur facture ${invoice.number}`,
+        notes: input.reason ?? `Annulation de la facture ${invoice.number}`,
+        items: items.map((it) => ({
+          label: it.label,
+          detail: it.detail,
+          quantity: it.quantity,
+          unit: it.unit,
+          unitPriceCents: -it.unitPriceCents,
+        })),
+        locale: (invoice.locale as "fr" | "en") ?? "fr",
+        vatRate: invoice.vatRate,
+        dueInDays: 0,
+      }).catch(async (err) => {
+        await db.update(schema.invoices).set({ status: invoice.status }).where(eq(schema.invoices.id, invoice.id));
+        throw err;
+      });
+      if (invoice.quoteRef) {
+        await db.update(schema.quotes).set({ status: "annule" }).where(eq(schema.quotes.ref, invoice.quoteRef));
+      }
+      await db.insert(schema.auditLog).values({
+        userId: context.user.id,
+        userEmail: context.user.email,
+        action: "invoice.credit_note",
+        target: invoice.number,
+        detail: `${avoir.number} — ${(avoir.totalCents / 100).toFixed(2)} € TTC`,
+      });
+      return { number: avoir.number };
+    }),
+
   /** Suivi du règlement (l'admin confirme le paiement carte ou virement). */
   setStatus: adminOnly
     .input(
@@ -374,6 +431,9 @@ export const invoices = {
         .where(eq(schema.invoices.number, input.number))
         .limit(1);
       if (!invoice) throw new ORPCError("NOT_FOUND", { message: "Facture introuvable" });
+      if (input.status === "annulee" && !invoice.number.startsWith("AV-")) {
+        throw new ORPCError("BAD_REQUEST", { message: "Une facture émise s'annule par un avoir (bouton « Annuler par avoir »)." });
+      }
 
       await db
         .update(schema.invoices)

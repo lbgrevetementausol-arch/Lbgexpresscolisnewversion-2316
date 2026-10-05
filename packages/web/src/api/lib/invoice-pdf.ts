@@ -96,7 +96,7 @@ export async function buildInvoicePdf(
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const logo = await embedLogo(doc);
 
-  doc.setTitle(`Facture ${invoice.number} - ${ISSUER.company}`);
+  doc.setTitle(`${invoice.number.startsWith("AV-") ? "Avoir" : "Facture"} ${invoice.number} - ${ISSUER.company}`);
   doc.setProducer(ISSUER.company);
   doc.setCreator(ISSUER.company);
 
@@ -118,7 +118,7 @@ export async function buildInvoicePdf(
     page.drawText("LBG EXPRESS COLIS", { x: M, y: A4.height - 68, size: 17, font: bold, color: WHITE });
   }
 
-  page.drawText("FACTURE", { x: right - 150, y: A4.height - 52, size: 22, font: bold, color: WHITE });
+  page.drawText(invoice.number.startsWith("AV-") ? "AVOIR" : "FACTURE", { x: right - 150, y: A4.height - 52, size: 22, font: bold, color: WHITE });
   page.drawText(safe(invoice.number), {
     x: right - 150,
     y: A4.height - 72,
@@ -199,13 +199,16 @@ export async function buildInvoicePdf(
   }
 
   /* --------------------------- Prestations --------------------------- */
-  const cols = { label: M, qty: right - 250, unit: right - 175, total: right - 70 };
+  // Colonnes chiffrées alignées à droite, avec une gouttière fixe : les montants ne se collent plus.
+  const cols = { label: M, qty: right - 200, unit: right - 100, total: right - 6 };
+  const drawRight = (text: string, xRight: number, yy: number, size: number, f: typeof font) =>
+    page.drawText(text, { x: xRight - f.widthOfTextAtSize(text, size), y: yy, size, font: f, color: INK });
 
   page.drawRectangle({ x: M, y: y - 6, width: A4.width - M * 2, height: 22, color: rgb(0.96, 0.97, 0.99) });
   page.drawText("PRESTATION", { x: cols.label + 6, y, size: 8, font: bold, color: MUTED });
-  page.drawText("QTÉ", { x: cols.qty, y, size: 8, font: bold, color: MUTED });
-  page.drawText("PRIX UNIT. HT", { x: cols.unit, y, size: 8, font: bold, color: MUTED });
-  page.drawText("TOTAL HT", { x: cols.total, y, size: 8, font: bold, color: MUTED });
+  page.drawText("QTÉ", { x: cols.qty - bold.widthOfTextAtSize("QTÉ", 8), y, size: 8, font: bold, color: MUTED });
+  page.drawText("PRIX UNIT. HT", { x: cols.unit - bold.widthOfTextAtSize("PRIX UNIT. HT", 8), y, size: 8, font: bold, color: MUTED });
+  page.drawText("TOTAL HT", { x: cols.total - bold.widthOfTextAtSize("TOTAL HT", 8), y, size: 8, font: bold, color: MUTED });
   y -= 28;
 
   const lines = items.length
@@ -223,11 +226,11 @@ export async function buildInvoicePdf(
 
   for (const item of lines) {
     if (y < 190) break;
-    page.drawText(fit(safe(item.label), bold, 10, cols.qty - cols.label - 18), { x: cols.label + 6, y, size: 10, font: bold, color: INK });
+    page.drawText(fit(safe(item.label), bold, 10, cols.qty - 60 - cols.label - 18), { x: cols.label + 6, y, size: 10, font: bold, color: INK });
     const qty = Number.isInteger(item.quantity) ? String(item.quantity) : String(item.quantity).replace(".", ",");
-    page.drawText(safe(`${qty} ${item.unit}`), { x: cols.qty, y, size: 9, font, color: INK });
-    page.drawText(euro(item.unitPriceCents), { x: cols.unit, y, size: 9, font, color: INK });
-    page.drawText(euro(item.totalCents), { x: cols.total, y, size: 9, font: bold, color: INK });
+    drawRight(safe(`${qty} ${item.unit}`), cols.qty, y, 9, font);
+    drawRight(euro(item.unitPriceCents), cols.unit, y, 9, font);
+    drawRight(euro(item.totalCents), cols.total, y, 9, bold);
     y -= 14;
     if (item.detail) {
       page.drawText(safe(item.detail).slice(0, 78), { x: cols.label + 6, y, size: 8, font, color: MUTED });
