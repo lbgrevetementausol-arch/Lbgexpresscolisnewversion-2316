@@ -487,8 +487,8 @@ export function QuoteForm({ variant }: { variant: QuoteVariant }) {
           <p className="mt-4 flex items-start gap-2 text-xs text-muted">
             <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" />
             {t({
-              fr: "Aucun prélèvement à cette étape. Vous recevez votre devis par e-mail, à accepter avant tout paiement.",
-              en: "No charge at this step. You receive your quote by email, to accept before any payment.",
+              fr: "Aucun prélèvement à cette étape. Vous recevez par e-mail votre facture proforma et un lien de paiement sécurisé myPOS : la commande est confirmée dès réception du paiement.",
+              en: "No charge at this step. You receive your proforma invoice and a secure myPOS payment link by email: the order is confirmed once payment is received.",
             })}
           </p>
         </Card>

@@ -51,8 +51,8 @@ export default function PaiementRetourPage() {
                 en: "The card payment wasn't completed: nothing has been charged. You can retry from your invoice or pay by bank transfer.",
               })
             : t({
-                fr: "Notre équipe vérifie le règlement sur le terminal MyPOS et passe votre facture en « Payée ». Vous recevez la confirmation par email.",
-                en: "Our team checks the payment on the MyPOS terminal and switches your invoice to “Paid”. You'll get an email confirmation.",
+                fr: "Dès que myPOS nous confirme le paiement, votre commande passe en « Commande confirmée » et vous recevez par e-mail votre confirmation avec la quittance de paiement myPOS.",
+                en: "As soon as myPOS confirms the payment, your order switches to “Order confirmed” and you receive an email confirmation with the myPOS payment receipt.",
               })
         }
       />
@@ -70,8 +70,8 @@ export default function PaiementRetourPage() {
                     en: "Your invoice stays open and payable: resume the card payment from its page, or ask us for our bank details to pay by transfer.",
                   })
                 : t({
-                    fr: "La validation est manuelle (contrôle humain du règlement) et intervient sous quelques heures ouvrées. Dès validation, l'enlèvement est planifié et votre numéro de suivi est généré.",
-                    en: "Confirmation is manual (a human checks the payment) and happens within a few business hours. Once confirmed, pickup is scheduled and your tracking number is issued.",
+                    fr: "La confirmation myPOS arrive en général en quelques instants. Le transporteur va vous contacter par téléphone dans l'heure (ou très rapidement) pour caler les derniers détails logistiques.",
+                    en: "The myPOS confirmation usually arrives within moments. The carrier will call you within the hour (or very shortly) to settle the final logistics details.",
                   })}
             </p>
             <div className="mt-4 flex flex-wrap gap-3">

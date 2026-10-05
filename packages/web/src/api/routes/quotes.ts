@@ -23,7 +23,9 @@ import {
   PAYS_INTERNATIONAL,
   type TypeService,
 } from "../../web/lib/pricing-strategique";
-import { mailQuoteAccepted, mailQuoteOps, mailQuoteReceipt } from "../services/email";
+import { mailQuoteOps } from "../services/email";
+import { sendProforma } from "../services/proforma";
+import { CONFIRMED_STATUSES, isExpired, VALIDITE_JOURS } from "../lib/quote-items";
 
 const zoneEnum = z.enum(Object.keys(ZONES) as [ZoneId, ...ZoneId[]]);
 const serviceEnum = z.enum(Object.keys(SERVICES) as [ServiceId, ...ServiceId[]]);
@@ -106,12 +108,7 @@ const quoteInput = priceInput.extend({
 });
 
 /** Entrée des 3 formulaires spécialisés (moteur « tarif stratégique »). */
-/** Validité d'un devis, en jours. */
-export const VALIDITE_JOURS = 15;
-/** Statuts où le devis est accepté (paiement / facturation autorisés). */
-export const ACCEPTED_STATUSES = ["accepte", "paye", "en_cours", "livre"];
-const isExpired = (q: { validUntil: Date | null; createdAt: Date }) =>
-  Date.now() > (q.validUntil ?? new Date(q.createdAt.getTime() + VALIDITE_JOURS * 86400000)).getTime();
+export { VALIDITE_JOURS };
 
 const strategiqueInput = z.object({
   typeService: z.enum(["covoiturage", "international", "demenagement"]),
@@ -284,21 +281,8 @@ export const quotes = {
       to: input.toAddress,
       serviceLabel,
     });
-    if (!generalReview) await mailQuoteReceipt({
-      to: input.customerEmail,
-      name: customerName,
-      firstName: input.customerFirstName,
-      ref: quote.ref,
-      orderNumber,
-      trackingNumber,
-      priceCents,
-      validUntil: quote.validUntil,
-      from: input.fromAddress,
-      to_: input.toAddress,
-      etaMin: price.etaDays[0],
-      etaMax: price.etaDays[1],
-      serviceLabel,
-    });
+    // Statut « Devis généré / En attente de paiement » : facture proforma PF + e-mail avec lien de paiement.
+    if (!generalReview) await sendProforma(quote, { serviceLabel });
     await mailQuoteOps({
       ref: quote.ref,
       orderNumber,
@@ -480,23 +464,14 @@ export const quotes = {
       to: input.toAddress,
       serviceLabel,
     });
-    if (!needsReview) await mailQuoteReceipt({
-      to: input.customerEmail,
-      name: customerName,
-      firstName: input.customerFirstName,
-      ref: quote.ref,
-      orderNumber,
-      trackingNumber,
-      priceCents,
-      ttcCents,
-      lines: price.lines.map((l) => ({ label: l.label.fr, amount: l.amount })),
-      validUntil: quote.validUntil,
-      from: input.fromAddress,
-      to_: input.toAddress,
-      etaMin: price.etaDays[0],
-      etaMax: price.etaDays[1],
-      serviceLabel,
-    });
+    // Statut « Devis généré / En attente de paiement » : facture proforma PF + e-mail avec lien de paiement.
+    if (!needsReview) {
+      await sendProforma(quote, {
+        serviceLabel,
+        lineLabel: serviceLabel,
+        lines: price.lines.map((l) => ({ label: l.label.fr, amount: l.amount })),
+      });
+    }
     await mailQuoteOps({
       ref: quote.ref,
       orderNumber,
@@ -549,8 +524,9 @@ export const quotes = {
   }),
 
   /**
-   * Acceptation explicite du devis par le client (case à cocher sur /paiement/:ref).
-   * Idempotente : un devis déjà accepté renvoie simplement son statut, sans second mail.
+   * Ancienne étape d'acceptation : n'est plus requise (le client paie directement
+   * depuis /paiement/:ref). Conservée pour compatibilité, sans e-mail ni confirmation :
+   * seule la notification de paiement myPOS confirme la commande.
    */
   accept: base
     .input(z.object({ ref: z.string().min(4).max(40), accept: z.literal(true) }))
@@ -558,87 +534,18 @@ export const quotes = {
       const ref = input.ref.trim().toUpperCase();
       const [quote] = await db.select().from(schema.quotes).where(eq(schema.quotes.ref, ref));
       if (!quote) throw new ORPCError("NOT_FOUND", { message: "Devis introuvable" });
-      if (ACCEPTED_STATUSES.includes(quote.status)) return { ok: true, status: quote.status, already: true };
       if (quote.status === "a_valider") {
         throw new ORPCError("BAD_REQUEST", { message: "Devis en cours de vérification par notre équipe : vous serez recontacté." });
       }
+      if (CONFIRMED_STATUSES.includes(quote.status) || quote.status === "accepte") return { ok: true, status: quote.status, already: true };
       if (quote.status !== "nouveau") throw new ORPCError("BAD_REQUEST", { message: "Ce devis n'est plus valable." });
       if (isExpired(quote)) {
         throw new ORPCError("BAD_REQUEST", { message: "Devis expiré (validité 15 jours) : demandez un nouveau devis." });
       }
-      // Mise à jour conditionnelle : deux clics simultanés ne confirment qu'une fois.
-      const updated = await db
+      await db
         .update(schema.quotes)
-        .set({ status: "accepte", acceptedAt: new Date() })
-        .where(and(eq(schema.quotes.id, quote.id), eq(schema.quotes.status, "nouveau")))
-        .returning({ id: schema.quotes.id });
-      if (updated.length === 0) return { ok: true, status: "accepte", already: true };
-      const ttcCents = quote.priceTtcCents ?? Math.round(quote.priceCents * 1.2);
-      if (quote.trackingNumber) {
-        await db.insert(schema.trackingEvents).values({
-          trackingNumber: quote.trackingNumber,
-          status: "cree",
-          labelFr: "Devis accepté — commande confirmée",
-          labelEn: "Quote accepted — order confirmed",
-          location: quote.fromAddress,
-        });
-      }
-      await mailQuoteAccepted({
-        to: quote.customerEmail,
-        name: quote.customerName,
-        firstName: quote.customerFirstName,
-        ref: quote.ref,
-        orderNumber: quote.orderNumber,
-        ttcCents,
-      });
-      return { ok: true, status: "accepte", already: false, value: ttcCents / 100 };
-    }),
-
-  /** Enregistrement d'un paiement (virement / carte via prestataire à connecter) */
-  pay: base
-    .input(
-      z.object({
-        ref: z.string().min(4),
-        provider: z.enum(["carte", "virement", "paypal", "especes"]),
-        payerEmail: z.string().email().optional(),
-      }),
-    )
-    .handler(async ({ input }) => {
-      const ref = input.ref.trim().toUpperCase();
-      const [quote] = await db.select().from(schema.quotes).where(eq(schema.quotes.ref, ref));
-      if (!quote) throw new ORPCError("NOT_FOUND", { message: "Devis introuvable" });
-      if (!ACCEPTED_STATUSES.includes(quote.status)) {
-        throw new ORPCError("BAD_REQUEST", { message: "Acceptez d'abord le devis avant le paiement." });
-      }
-
-      const reference = generateRef("PAY");
-      const status = input.provider === "virement" ? "en_attente" : "confirme";
-      await db.insert(schema.payments).values({
-        quoteRef: ref,
-        provider: input.provider,
-        amountCents: Math.round(quote.priceCents * 1.2),
-        status,
-        reference,
-        payerEmail: input.payerEmail ?? quote.customerEmail,
-      });
-
-      if (status === "confirme") {
-        await db.update(schema.quotes).set({ status: "paye" }).where(eq(schema.quotes.ref, ref));
-        if (quote.trackingNumber) {
-          await db
-            .update(schema.trackings)
-            .set({ status: "pris_en_charge", updatedAt: new Date() })
-            .where(eq(schema.trackings.trackingNumber, quote.trackingNumber));
-          await db.insert(schema.trackingEvents).values({
-            trackingNumber: quote.trackingNumber,
-            status: "pris_en_charge",
-            labelFr: "Paiement confirmé — expédition planifiée",
-            labelEn: "Payment confirmed — shipment scheduled",
-            location: quote.fromAddress,
-          });
-        }
-      }
-
-      return { reference, status, amount: quote.priceCents / 100, trackingNumber: quote.trackingNumber };
+        .set({ acceptedAt: new Date() })
+        .where(and(eq(schema.quotes.id, quote.id), eq(schema.quotes.status, "nouveau")));
+      return { ok: true, status: quote.status, already: false, value: (quote.priceTtcCents ?? Math.round(quote.priceCents * 1.2)) / 100 };
     }),
 };

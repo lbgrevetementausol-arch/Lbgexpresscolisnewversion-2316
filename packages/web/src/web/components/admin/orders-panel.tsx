@@ -10,6 +10,18 @@ import { useCheckout } from "../../queries/invoices";
 const FILTERS = ["tous", "nouveau", "a_valider", "accepte", "refuse", "paye", "en_cours", "livre", "annule"] as const;
 type Filter = (typeof FILTERS)[number];
 
+/** Libellés métier (clés DB inchangées) : nouveau = devis en attente de paiement, paye = commande confirmée. */
+const STATUS_LABEL: Record<string, string> = {
+  nouveau: "Devis généré / En attente de paiement",
+  a_valider: "À valider",
+  accepte: "Devis accepté (ancien)",
+  refuse: "Refusé",
+  paye: "Commande confirmée (payée)",
+  en_cours: "En cours",
+  livre: "Livré",
+  annule: "Annulé",
+};
+
 /** Commandes en temps réel : acceptation, refus, statut, génération de facture. */
 export function OrdersPanel() {
   const { t, lang } = useI18n();
@@ -47,7 +59,7 @@ export function OrdersPanel() {
                 : "rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted transition hover:border-primary/40"
             }
           >
-            {item}
+            {item === "tous" ? item : (STATUS_LABEL[item] ?? item)}
           </button>
         ))}
       </div>
@@ -61,7 +73,7 @@ export function OrdersPanel() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="font-semibold">
-                  {order.ref} <span className="text-xs font-normal text-muted">· {order.status}</span>
+                  {order.ref} <span className="text-xs font-normal text-muted">· {STATUS_LABEL[order.status] ?? order.status}</span>
                 </p>
                 <p className="mt-1 text-sm">
                   {order.customerName} — {order.customerEmail}
@@ -132,7 +144,7 @@ export function OrdersPanel() {
               >
                 {FILTERS.filter((f) => f !== "tous").map((f) => (
                   <option key={f} value={f}>
-                    {f}
+                    {STATUS_LABEL[f] ?? f}
                   </option>
                 ))}
               </select>

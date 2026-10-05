@@ -174,6 +174,10 @@ export function InvoicesPanel() {
                   <span className="text-lg font-bold">{moneyCents(invoice.totalCents, lang)}</span>
                   {invoice.number.startsWith("AV-") ? (
                     <span className="rounded-xl bg-surface-2 px-3 py-2 text-xs font-semibold">{t({ fr: "Avoir", en: "Credit note" })}</span>
+                  ) : invoice.number.startsWith("PF-") ? (
+                    <span className="rounded-xl bg-surface-2 px-3 py-2 text-xs font-semibold">
+                      {t({ fr: "Proforma — confirmée par myPOS", en: "Pro forma — confirmed by myPOS" })}
+                    </span>
                   ) : (
                   <>
                   {invoice.status === "payee" || invoice.status === "annulee" ? null : (

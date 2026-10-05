@@ -1,16 +1,17 @@
 import { ORPCError } from "@orpc/server";
-import { and, asc, desc, eq, ne } from "drizzle-orm";
+import { and, asc, desc, eq, like, ne } from "drizzle-orm";
 import { z } from "zod";
 import { base } from "../__core/app";
 import { db } from "../database";
 import { publishJobOffer } from "../services/job-offers";
 import * as schema from "../database/schema";
-import { createInvoice, ISSUER, myposUrl, totalsFor, VAT_RATE } from "../lib/invoicing";
+import { createInvoice, isProforma, ISSUER, myposUrl, VAT_RATE } from "../lib/invoicing";
 import { buildPurchase, myposConfig, publicBaseUrl } from "../lib/mypos";
 import { computePrice, generateRef, KIND_COEF, SERVICES, ZONES } from "../lib/pricing";
 import type { ServiceId, ShipmentKind, ZoneId } from "../lib/pricing";
 import { getPricingConfig } from "../lib/settings";
-import { mailInvoice } from "../services/email";
+import { issueProforma, sendProforma } from "../services/proforma";
+import { isExpired, PAYABLE_STATUSES, WAITING_STATUSES } from "../lib/quote-items";
 import { adminOnly, authed, withUser } from "../middleware/auth";
 
 const zoneEnum = z.enum(Object.keys(ZONES) as [ZoneId, ...ZoneId[]]);
@@ -26,50 +27,6 @@ async function loadInvoice(number: string) {
     .where(eq(schema.invoiceItems.invoiceId, invoice.id))
     .orderBy(asc(schema.invoiceItems.position));
   return { invoice, items, issuer: ISSUER, paymentUrl: myposUrl() };
-}
-
-/**
- * Détail des lignes facturées à partir d'une commande/devis.
- *
- * IMPORTANT — le montant facturé est TOUJOURS le `priceCents` enregistré sur le
- * devis, c'est-à-dire le prix ferme annoncé puis accepté par le client. On ne
- * recalcule jamais le tarif au moment de la facturation : plusieurs paramètres
- * de la simulation d'origine (distance routière, accès difficile / portage long,
- * barème en vigueur ce jour-là) ne sont pas stockés en colonnes dédiées, donc un
- * recalcul produit un montant différent de celui contractualisé. Facturer ce
- * recalcul revenait à facturer un prix que le client n'a jamais accepté.
- */
-async function itemsFromQuote(quote: typeof schema.quotes.$inferSelect) {
-  const zone = (quote.zone ?? "france") as ZoneId;
-  const service = (quote.service ?? "standard") as ServiceId;
-
-  const acceptedCents = Math.round(quote.priceCents ?? 0);
-  if (acceptedCents <= 0) {
-    throw new ORPCError("BAD_REQUEST", {
-      message: `Commande ${quote.ref} : aucun montant de devis enregistré, facturation impossible.`,
-    });
-  }
-
-  const detail = [
-    `Enlèvement : ${quote.fromAddress}`,
-    `Livraison : ${quote.toAddress}`,
-    quote.weightKg ? `Poids : ${quote.weightKg} kg` : null,
-    quote.volumeM3 ? `Volume : ${quote.volumeM3} m³` : null,
-    quote.pieces && quote.pieces > 1 ? `${quote.pieces} colis` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
-  const lines = [
-    {
-      label: `Transport ${ZONES[zone].label.fr} — service ${SERVICES[service].label.fr}`,
-      detail,
-      quantity: 1,
-      unit: "forfait",
-      unitPriceCents: acceptedCents,
-    },
-  ];
-  return { lines, acceptedCents };
 }
 
 export const invoices = {
@@ -120,51 +77,29 @@ export const invoices = {
           .where(eq(schema.quotes.ref, input.quoteRef))
           .limit(1);
         if (!quote) throw new ORPCError("NOT_FOUND", { message: "Commande introuvable" });
-        if (!["accepte", "paye", "en_cours", "livre"].includes(quote.status)) {
-          throw new ORPCError("FORBIDDEN", { message: "Acceptez d'abord le devis avant le paiement." });
+        if (quote.status === "a_valider") {
+          throw new ORPCError("FORBIDDEN", { message: "Devis en cours de vérification par notre équipe : vous serez recontacté." });
+        }
+        if (!PAYABLE_STATUSES.includes(quote.status)) {
+          throw new ORPCError("FORBIDDEN", { message: "Ce devis n'est plus valable." });
         }
 
+        // Ancienne commande déjà facturée (FA) : on reprend sa facture.
         const [existing] = await db
           .select()
           .from(schema.invoices)
-          .where(eq(schema.invoices.quoteRef, quote.ref))
+          .where(and(eq(schema.invoices.quoteRef, quote.ref), like(schema.invoices.number, "FA-%"), ne(schema.invoices.status, "annulee")))
           .limit(1);
         if (existing) {
           return { number: existing.number, quoteRef: quote.ref, paymentUrl: myposUrl(), reused: true };
         }
-
-        const { lines } = await itemsFromQuote(quote);
-        // Garde-fou : la facture doit reprendre exactement le devis accepté.
-        const expectedTtc = Math.round(quote.priceCents * (1 + VAT_RATE / 100));
-        if (Math.abs(totalsFor(lines).totalCents - expectedTtc) > 1) {
-          throw new ORPCError("CONFLICT", { message: `Montant de facture différent du devis ${quote.ref} : émission bloquée.` });
+        if (WAITING_STATUSES.includes(quote.status) && isExpired(quote)) {
+          throw new ORPCError("BAD_REQUEST", { message: "Devis expiré (validité 15 jours) : demandez un nouveau devis." });
         }
-        const { invoice } = await createInvoice({
-          quoteRef: quote.ref,
-          userId: context.user?.id ?? quote.userId ?? null,
-          customerName: quote.customerName,
-          customerEmail: quote.customerEmail,
-          customerPhone: quote.customerPhone,
-          customerCompany: quote.company,
-          customerAddress: quote.fromAddress,
-          subject: input.subject ?? `Commande ${quote.ref}`,
-          items: lines,
-          locale: (quote.locale as "fr" | "en") ?? input.locale,
-        });
-        await db
-          .update(schema.quotes)
-          .set({ invoiceId: invoice.id, status: quote.status === "nouveau" ? "a_valider" : quote.status })
-          .where(eq(schema.quotes.id, quote.id));
-        await mailInvoice({
-          to: invoice.customerEmail,
-          name: invoice.customerName,
-          number: invoice.number,
-          subject: invoice.subject ?? `Commande ${quote.ref}`,
-          totalCents: invoice.totalCents,
-          dueAt: invoice.dueAt,
-          paymentUrl: myposUrl(),
-        });
-        return { number: invoice.number, quoteRef: quote.ref, paymentUrl: myposUrl(), reused: false };
+
+        // Nouveau parcours : on paie la proforma PF (émise à la création du devis).
+        const { invoice, created } = await issueProforma(quote);
+        return { number: invoice.number, quoteRef: quote.ref, paymentUrl: myposUrl(), reused: !created };
       }
 
       // 2) Paiement direct (bouton hors devis) → commande créée à la volée.
@@ -201,12 +136,14 @@ export const invoices = {
         volumeM3: svc.volumeM3 ?? null,
         pieces: svc.pieces ?? 1,
         priceCents: Math.round(price.total * 100),
-        status: "a_valider",
+        status: "nouveau",
+        validUntil: new Date(Date.now() + 15 * 86400000),
         userId: context.user?.id ?? null,
         locale: input.locale,
       });
 
       const { invoice } = await createInvoice({
+        numberPrefix: "PF",
         quoteRef: ref,
         userId: context.user?.id ?? null,
         customerName: customer.name,
@@ -226,15 +163,8 @@ export const invoices = {
         locale: input.locale,
       });
 
-      await mailInvoice({
-        to: invoice.customerEmail,
-        name: invoice.customerName,
-        number: invoice.number,
-        subject: invoice.subject ?? "Prestation de transport",
-        totalCents: invoice.totalCents,
-        dueAt: invoice.dueAt,
-        paymentUrl: myposUrl(),
-      });
+      const [created] = await db.select().from(schema.quotes).where(eq(schema.quotes.ref, ref)).limit(1);
+      if (created) await sendProforma(created, { serviceLabel: svc.label ?? null, lineLabel: svc.label ?? null });
 
       return { number: invoice.number, quoteRef: ref, paymentUrl: myposUrl(), reused: false };
     }),
@@ -254,6 +184,9 @@ export const invoices = {
       if (!invoice) throw new ORPCError("NOT_FOUND", { message: "Facture introuvable" });
       if (invoice.status === "payee") {
         throw new ORPCError("BAD_REQUEST", { message: "Facture déjà réglée" });
+      }
+      if (invoice.number.startsWith("AV-") || invoice.status === "annulee") {
+        throw new ORPCError("BAD_REQUEST", { message: "Document non payable." });
       }
       // Checkout signé désactivable : tant que la boutique myPOS n'est pas
       // débloquée côté myPOS, on renvoie le lien de paiement myPOS simple.
@@ -314,10 +247,12 @@ export const invoices = {
               .from(schema.invoices)
               .where(eq(schema.invoices.status, input.status))
               .orderBy(desc(schema.invoices.createdAt));
+      // Les proformas ne sont pas des pièces comptables : hors totaux (la FA payée y figure).
+      const accounting = rows.filter((r) => !isProforma(r.number));
       const totals = {
         count: rows.length,
-        pendingCents: rows.filter((r) => r.status === "en_attente_paiement").reduce((s, r) => s + r.totalCents, 0),
-        paidCents: rows.filter((r) => r.status === "payee").reduce((s, r) => s + r.totalCents, 0),
+        pendingCents: accounting.filter((r) => r.status === "en_attente_paiement").reduce((s, r) => s + r.totalCents, 0),
+        paidCents: accounting.filter((r) => r.status === "payee").reduce((s, r) => s + r.totalCents, 0),
       };
       return { rows, totals };
     }),
@@ -369,6 +304,7 @@ export const invoices = {
     .handler(async ({ input, context }) => {
       const { invoice, items } = await loadInvoice(input.number);
       if (invoice.number.startsWith("AV-")) throw new ORPCError("BAD_REQUEST", { message: "Un avoir ne s'annule pas." });
+      if (isProforma(invoice.number)) throw new ORPCError("BAD_REQUEST", { message: "Une proforma n'est pas une facture : pas d'avoir." });
       // Verrou : la facture passe « annulée » AVANT l'avoir ; un second clic simultané échoue ici.
       const claimed = await db
         .update(schema.invoices)
@@ -431,6 +367,9 @@ export const invoices = {
         .where(eq(schema.invoices.number, input.number))
         .limit(1);
       if (!invoice) throw new ORPCError("NOT_FOUND", { message: "Facture introuvable" });
+      if (isProforma(invoice.number)) {
+        throw new ORPCError("BAD_REQUEST", { message: "Proforma : le paiement est confirmé automatiquement par la notification myPOS." });
+      }
       if (input.status === "annulee" && !invoice.number.startsWith("AV-")) {
         throw new ORPCError("BAD_REQUEST", { message: "Une facture émise s'annule par un avoir (bouton « Annuler par avoir »)." });
       }

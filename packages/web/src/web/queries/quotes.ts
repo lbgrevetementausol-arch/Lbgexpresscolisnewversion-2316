@@ -36,10 +36,6 @@ export function useQuote(ref: string) {
   );
 }
 
-export function usePayQuote() {
-  return useMutation(orpc.quotes.pay.mutationOptions());
-}
-
 /** Acceptation explicite du devis par le client (idempotente côté serveur). */
 export function useAcceptQuote() {
   return useMutation(orpc.quotes.accept.mutationOptions());

@@ -35,8 +35,8 @@ const GROUPS: { title: { fr: string; en: string }; items: Qa[] }[] = [
       {
         q: { fr: "Quels moyens de paiement acceptez-vous ?", en: "Which payment methods do you accept?" },
         a: {
-          fr: "Carte bancaire, virement, PayPal et espèces à l'enlèvement. Le virement place la commande en attente jusqu'à réception des fonds ; les autres moyens la confirment immédiatement.",
-          en: "Card, bank transfer, PayPal and cash on pickup. A bank transfer keeps the order pending until funds arrive; other methods confirm it immediately.",
+          fr: "Carte bancaire, sur notre page de paiement sécurisée myPOS. La commande est confirmée automatiquement dès réception du paiement.",
+          en: "Card, on our secure myPOS payment page. The order is confirmed automatically once payment is received.",
         },
       },
       {

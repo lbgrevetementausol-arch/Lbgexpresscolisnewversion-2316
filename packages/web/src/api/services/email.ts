@@ -109,14 +109,22 @@ const table = (rows: string) => `<table role="presentation" style="font-size:14p
 /*                          E-mails métier                             */
 /* ------------------------------------------------------------------ */
 
-/** 1. E-mail de remerciement et de confirmation de commande, au client. */
-export async function mailQuoteReceipt(args: {
+/** Phrase obligatoire du mail de confirmation (après paiement myPOS uniquement). */
+export const CARRIER_CALL_SENTENCE =
+  "Le transporteur va vous contacter par téléphone dans l'heure (ou très rapidement) pour caler les derniers détails logistiques.";
+
+/**
+ * 1. Devis généré — en attente de paiement : facture proforma PF en pièce jointe
+ * et bouton vers la page de paiement. Ne confirme rien : seule la notification
+ * de paiement myPOS confirme la commande.
+ */
+export async function mailProforma(args: {
   to: string;
   name: string;
   firstName?: string | null;
   ref: string;
   orderNumber?: string | null;
-  trackingNumber: string;
+  proformaNumber: string;
   /** Montant HT en centimes (source en base). */
   priceCents: number;
   /** Montant TTC figé au devis ; à défaut HT × 1,2. */
@@ -126,9 +134,10 @@ export async function mailQuoteReceipt(args: {
   validUntil?: Date | null;
   from: string;
   to_: string;
-  etaMin: number;
-  etaMax: number;
+  etaMin?: number | null;
+  etaMax?: number | null;
   serviceLabel?: string | null;
+  pdfBase64: string;
 }) {
   const prenom = args.firstName?.trim() || args.name;
   const numero = args.orderNumber ?? args.ref;
@@ -141,69 +150,36 @@ export async function mailQuoteReceipt(args: {
       table(args.lines.map((l) => row(l.label, euro(Math.round(l.amount * 100)))).join(""))
     : "";
   const html = layout(
-    `Votre devis LBG Express Colis${args.orderNumber ? ` n° ${args.orderNumber}` : ""}`,
+    `Votre devis n° ${numero} — facture proforma ${args.proformaNumber}`,
     `<p>Bonjour ${esc(prenom)},</p>
-     <p>Voici votre devis. Il est valable jusqu'au ${esc(validite)}. <strong>Votre commande n'est confirmée qu'après votre acceptation du devis.</strong></p>
+     <p>Merci pour votre demande. Votre devis est généré : vous trouverez la <strong>facture proforma ${esc(args.proformaNumber)}</strong> en pièce jointe (PDF).</p>
+     <p><strong>Statut : devis généré — en attente de paiement.</strong> Devis valable jusqu'au ${esc(validite)}.</p>
      ${table(
        row("Numéro de devis", numero) +
+         row("Facture proforma", args.proformaNumber) +
          row("Référence dossier", args.ref) +
          row("Prestation", args.serviceLabel) +
          row("Départ", args.from) +
          row("Arrivée", args.to_) +
-         row("Délai estimé", `${args.etaMin} à ${args.etaMax} jours ouvrés`) +
+         row("Délai estimé", args.etaMin && args.etaMax ? `${args.etaMin} à ${args.etaMax} jours ouvrés` : null) +
          row("Montant TTC", euro(ttc)) +
          row("dont HT", euro(args.priceCents)) +
          row("dont TVA 20 %", euro(ttc - args.priceCents)),
      )}
      ${detail}
      <p>Prix ferme sous réserve que le volume, les étages et les accès soient conformes à votre déclaration.</p>
-     <p><strong>La suite :</strong> acceptez le devis avec le bouton ci-dessous, puis réglez depuis votre espace de paiement sécurisé. Pour toute question, rappelez votre numéro <strong>${esc(numero)}</strong> — par téléphone au ${esc(ISSUER.phone)}, sur WhatsApp ou par retour d'e-mail.</p>
+     <p><strong>La suite :</strong> réglez ${esc(euro(ttc))} TTC par carte bancaire sur notre page de paiement sécurisée myPOS (bouton ci-dessous). Dès réception du paiement, vous recevez par e-mail votre confirmation, votre facture et votre quittance de paiement.</p>
+     <p>Une question ? Rappelez votre numéro <strong>${esc(numero)}</strong> — par téléphone au ${esc(ISSUER.phone)}, sur WhatsApp ou par retour d'e-mail.</p>
      <p>À très vite,<br />L'équipe LBG Express Colis</p>`,
-    { label: "Consulter et accepter mon devis", href: `${SITE}/paiement/${encodeURIComponent(args.ref)}` },
+    { label: `Payer ${euro(ttc)} par carte`, href: `${SITE}/paiement/${encodeURIComponent(args.ref)}` },
   );
   return sendEmail({
     to: args.to,
-    subject: args.orderNumber
-      ? `Votre devis LBG Express Colis n° ${args.orderNumber}`
-      : `Devis ${args.ref} — LBG Express Colis`,
+    subject: `Votre devis n° ${numero} — facture proforma ${args.proformaNumber} — LBG Express Colis`,
     html,
+    replyTo: OPS,
+    attachments: [{ filename: `Proforma-${args.proformaNumber}.pdf`, content: args.pdfBase64 }],
   });
-}
-
-/** 1 bis. Devis accepté par le client : confirmation de commande + alerte interne. */
-export async function mailQuoteAccepted(args: {
-  to: string;
-  name: string;
-  firstName?: string | null;
-  ref: string;
-  orderNumber?: string | null;
-  ttcCents: number;
-  serviceLabel?: string | null;
-}) {
-  const prenom = args.firstName?.trim() || args.name;
-  const numero = args.orderNumber ?? args.ref;
-  const client = layout(
-    `Commande confirmée n° ${numero}`,
-    `<p>Bonjour ${esc(prenom)},</p>
-     <p>Vous avez accepté le devis <strong>${esc(numero)}</strong> (${esc(euro(args.ttcCents))} TTC). Votre commande est confirmée.</p>
-     <p>Il ne reste qu'à régler depuis votre espace de paiement sécurisé ; notre équipe vous recontacte pour planifier la prestation.</p>
-     <p>L'équipe LBG Express Colis</p>`,
-    { label: "Accéder au paiement", href: `${SITE}/paiement/${encodeURIComponent(args.ref)}` },
-  );
-  const ops = layout(
-    `Devis accepté — n° ${numero}`,
-    `<p>Le client a accepté son devis.</p>` +
-      table(
-        row("Client", args.name) +
-          row("E-mail", args.to) +
-          row("Référence", args.ref) +
-          row("Prestation", args.serviceLabel) +
-          row("Montant TTC", euro(args.ttcCents)),
-      ),
-    { label: "Ouvrir le back-office", href: `${SITE}/admin` },
-  );
-  await sendEmail({ to: OPS, subject: `Devis accepté n° ${numero} — ${args.name}`, html: ops });
-  return sendEmail({ to: args.to, subject: `Commande confirmée n° ${numero} — LBG Express Colis`, html: client });
 }
 
 /** 2. Notification interne : nouvelle commande reçue. */
@@ -329,39 +305,68 @@ export async function mailInvoice(args: {
   });
 }
 
-/** 5 bis. Confirmation de paiement + facture PDF en pièce jointe. */
-export async function mailInvoicePaid(args: {
+/**
+ * 5 bis. Commande confirmée — envoyé UNIQUEMENT après notification de paiement myPOS
+ * vérifiée : remerciement, quittance de paiement myPOS + facture acquittée en PDF.
+ */
+export async function mailOrderConfirmed(args: {
   to: string;
   name: string;
-  number: string;
+  ref?: string | null;
+  orderNumber?: string | null;
+  invoiceNumber: string;
+  proformaNumber?: string | null;
   subject: string;
   totalCents: number;
   paidAt: Date;
   paymentReference: string;
-  pdfBase64: string;
+  receiptPdfBase64: string;
+  invoicePdfBase64?: string | null;
   unsubscribeUrl: string;
 }) {
+  const numero = args.orderNumber ?? args.ref ?? args.invoiceNumber;
   const html = layout(
-    `Paiement reçu — facture ${args.number}`,
+    `Commande confirmée n° ${numero}`,
     `<p>Bonjour ${esc(args.name)},</p>
-     <p>Nous avons bien reçu votre paiement. Votre facture acquittée est jointe à cet e-mail au format PDF.</p>
+     <p>Merci pour votre confiance ! Votre paiement par carte via myPOS a bien été reçu : <strong>votre commande n° ${esc(numero)} est confirmée.</strong></p>
+     <p><strong>${esc(CARRIER_CALL_SENTENCE)}</strong></p>
      ${table(
-       row("Facture", args.number) +
+       row("Commande", numero) +
          row("Prestation", args.subject) +
          row("Montant réglé", euro(args.totalCents)) +
-         row("Payé le", args.paidAt.toLocaleDateString("fr-FR")) +
+         row("Payé le", args.paidAt.toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })) +
          row("Moyen de paiement", "Carte bancaire (myPOS)") +
-         row("Référence", args.paymentReference),
+         row("Référence transaction myPOS", args.paymentReference) +
+         row("Facture", args.invoiceNumber) +
+         row("Facture proforma", args.proformaNumber),
      )}
-     <p>Merci de votre confiance. Pour toute question, répondez simplement à cet e-mail ou écrivez-nous sur WhatsApp au ${esc(ISSUER.phone)}.</p>
+     <p>Vous trouverez en pièces jointes votre <strong>quittance de paiement myPOS</strong> et votre facture acquittée (PDF).</p>
+     <p>Pour toute question, répondez simplement à cet e-mail ou écrivez-nous sur WhatsApp au ${esc(ISSUER.phone)}.</p>
+     <p>L'équipe LBG Express Colis</p>
      <p style="margin-top:22px;font-size:12px;color:#8296b5">En tant que client, vous recevrez occasionnellement nos actualités et offres de transport. Vous pouvez vous <a href="${args.unsubscribeUrl}" style="color:#06b6d4">désinscrire en un clic</a> à tout moment.</p>`,
   );
+  const attachments = [{ filename: `Quittance-myPOS-${args.invoiceNumber}.pdf`, content: args.receiptPdfBase64 }];
+  if (args.invoicePdfBase64) attachments.push({ filename: `Facture-${args.invoiceNumber}.pdf`, content: args.invoicePdfBase64 });
+  const ops = layout(
+    `Commande payée n° ${numero} — appeler le client`,
+    `<p>Paiement myPOS confirmé. Le client attend un appel du transporteur dans l'heure.</p>` +
+      table(
+        row("Client", args.name) +
+          row("E-mail", args.to) +
+          row("Référence", args.ref) +
+          row("Montant TTC", euro(args.totalCents)) +
+          row("Transaction myPOS", args.paymentReference) +
+          row("Facture", args.invoiceNumber),
+      ),
+    { label: "Ouvrir le back-office", href: `${SITE}/admin` },
+  );
+  await sendEmail({ to: OPS, subject: `[Payée] Commande n° ${numero} — ${args.name} — ${euro(args.totalCents)}`, html: ops });
   return sendEmail({
     to: args.to,
-    subject: `Paiement confirmé — facture ${args.number} — LBG Express Colis`,
+    subject: `Commande confirmée n° ${numero} — merci ! — LBG Express Colis`,
     html,
     replyTo: OPS,
-    attachments: [{ filename: `Facture-${args.number}.pdf`, content: args.pdfBase64 }],
+    attachments,
   });
 }
 

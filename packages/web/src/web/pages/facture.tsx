@@ -101,7 +101,11 @@ export default function FacturePage() {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-              {doc.number.startsWith("AV-") ? t({ fr: "Avoir", en: "Credit note" }) : t({ fr: "Facture", en: "Invoice" })}
+              {doc.number.startsWith("AV-")
+                ? t({ fr: "Avoir", en: "Credit note" })
+                : doc.number.startsWith("PF-")
+                  ? t({ fr: "Facture proforma", en: "Pro forma invoice" })
+                  : t({ fr: "Facture", en: "Invoice" })}
             </p>
             <h1 className="mt-1 text-3xl font-extrabold">{doc.number}</h1>
           </div>
@@ -264,8 +268,8 @@ export default function FacturePage() {
               {payError ? <p className="mt-2 text-xs text-danger">{payError}</p> : null}
               <p className="mt-3 text-xs text-muted">
                 {t({
-                  fr: "Après paiement, revenez sur le site : notre équipe valide le règlement et la facture passe en « Payée ».",
-                  en: "After paying, come back to the site: our team confirms the payment and the invoice switches to “Paid”.",
+                  fr: "Dès réception du paiement myPOS, la commande est confirmée automatiquement et vous recevez votre quittance par e-mail.",
+                  en: "As soon as the myPOS payment is received, the order is confirmed automatically and your receipt is emailed to you.",
                 })}
               </p>
             </Card>

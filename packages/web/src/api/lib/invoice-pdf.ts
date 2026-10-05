@@ -96,7 +96,9 @@ export async function buildInvoicePdf(
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const logo = await embedLogo(doc);
 
-  doc.setTitle(`${invoice.number.startsWith("AV-") ? "Avoir" : "Facture"} ${invoice.number} - ${ISSUER.company}`);
+  const proforma = invoice.number.startsWith("PF-");
+  const docLabel = invoice.number.startsWith("AV-") ? "Avoir" : proforma ? "Facture proforma" : "Facture";
+  doc.setTitle(`${docLabel} ${invoice.number} - ${ISSUER.company}`);
   doc.setProducer(ISSUER.company);
   doc.setCreator(ISSUER.company);
 
@@ -118,7 +120,7 @@ export async function buildInvoicePdf(
     page.drawText("LBG EXPRESS COLIS", { x: M, y: A4.height - 68, size: 17, font: bold, color: WHITE });
   }
 
-  page.drawText(invoice.number.startsWith("AV-") ? "AVOIR" : "FACTURE", { x: right - 150, y: A4.height - 52, size: 22, font: bold, color: WHITE });
+  page.drawText(docLabel.toUpperCase(), { x: right - 150, y: A4.height - 52, size: proforma ? 15 : 22, font: bold, color: WHITE });
   page.drawText(safe(invoice.number), {
     x: right - 150,
     y: A4.height - 72,
@@ -246,7 +248,8 @@ export async function buildInvoicePdf(
   const totalsX = right - 250;
   const put = (label: string, value: string, strong = false) => {
     page.drawText(safe(label), { x: totalsX, y, size: strong ? 11 : 9, font: strong ? bold : font, color: strong ? INK : MUTED });
-    page.drawText(value, { x: cols.total, y, size: strong ? 11 : 9, font: bold, color: strong ? ACCENT : INK });
+    const size = strong ? 11 : 9;
+    page.drawText(value, { x: cols.total - bold.widthOfTextAtSize(value, size), y, size, font: bold, color: strong ? ACCENT : INK });
     y -= strong ? 20 : 15;
   };
 
@@ -255,6 +258,12 @@ export async function buildInvoicePdf(
   page.drawLine({ start: { x: totalsX, y: y + 6 }, end: { x: right, y: y + 6 }, thickness: 0.5, color: LINE });
   y -= 6;
   put("TOTAL TTC", euro(invoice.totalCents), true);
+
+  if (proforma && invoice.status !== "payee") {
+    page.drawText("Facture proforma : document avant paiement, sans valeur comptable.", { x: totalsX, y, size: 8, font, color: MUTED });
+    y -= 11;
+    page.drawText("Paiement par carte (myPOS) ; facture définitive après paiement.", { x: totalsX, y, size: 8, font, color: MUTED });
+  }
 
   if (invoice.status === "payee") {
     page.drawText("Montant réglé - aucun paiement supplémentaire n'est dû.", {
@@ -277,6 +286,81 @@ export async function buildInvoicePdf(
   footer.forEach((line, i) => {
     page.drawText(line.slice(0, 150), { x: M, y: 80 - i * 11, size: 7, font, color: MUTED });
   });
+
+  return doc.save();
+}
+
+export interface ReceiptPdfInput {
+  invoiceNumber: string;
+  proformaNumber?: string | null;
+  orderNumber?: string | null;
+  customerName: string;
+  customerEmail: string;
+  subject?: string | null;
+  totalCents: number;
+  paidAt: Date;
+  transactionRef: string;
+}
+
+/** Quittance de paiement myPOS : preuve de règlement remise au client après confirmation. */
+export async function buildReceiptPdf(input: ReceiptPdfInput): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([A4.width, A4.height]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const logo = await embedLogo(doc);
+  doc.setTitle(`Quittance de paiement ${input.invoiceNumber} - ${ISSUER.company}`);
+  doc.setProducer(ISSUER.company);
+
+  const M = 48;
+  const right = A4.width - M;
+  page.drawRectangle({ x: 0, y: A4.height - 118, width: A4.width, height: 118, color: INK });
+  if (logo) {
+    const scaled = logo.scaleToFit(120, 46);
+    page.drawImage(logo, { x: M, y: A4.height - 60 - scaled.height / 2, width: scaled.width, height: scaled.height });
+  } else {
+    page.drawText("LBG EXPRESS COLIS", { x: M, y: A4.height - 68, size: 17, font: bold, color: WHITE });
+  }
+  page.drawText("QUITTANCE DE PAIEMENT", { x: right - 200, y: A4.height - 52, size: 15, font: bold, color: WHITE });
+  page.drawText(safe(`Facture ${input.invoiceNumber}`), { x: right - 200, y: A4.height - 72, size: 11, font, color: ACCENT });
+  page.drawText(`Date : ${frDate(input.paidAt)}`, { x: right - 200, y: A4.height - 90, size: 9, font, color: rgb(0.72, 0.78, 0.86) });
+
+  let y = A4.height - 170;
+  const text = (value: string, size = 10, f = font, color = INK) => {
+    page.drawText(safe(value).slice(0, 110), { x: M, y, size, font: f, color });
+    y -= size + 8;
+  };
+  text(`${ISSUER.company} - ${ISSUER.address}, ${ISSUER.postalCity} - SIRET ${ISSUER.siret}`, 9, font, MUTED);
+  y -= 10;
+  text(`Reçu de : ${input.customerName} (${input.customerEmail})`, 11, bold);
+  text(`La somme de : ${euro(input.totalCents)} TTC`, 11, bold);
+  y -= 6;
+  const rows: [string, string | null | undefined][] = [
+    ["Objet", input.subject ?? "Prestation de transport"],
+    ["Commande", input.orderNumber],
+    ["Facture proforma", input.proformaNumber],
+    ["Facture", input.invoiceNumber],
+    ["Payé le", input.paidAt.toLocaleString("fr-FR", { timeZone: "Europe/Paris" })],
+    ["Moyen de paiement", "Carte bancaire - myPOS Checkout"],
+    ["Référence transaction myPOS", input.transactionRef],
+  ];
+  for (const [k, v] of rows) {
+    if (!v) continue;
+    page.drawText(safe(k), { x: M, y, size: 9, font, color: MUTED });
+    page.drawText(safe(v).slice(0, 70), { x: M + 170, y, size: 10, font: bold, color: INK });
+    y -= 18;
+  }
+  y -= 10;
+  page.drawLine({ start: { x: M, y }, end: { x: right, y }, thickness: 0.5, color: LINE });
+  y -= 20;
+  text("Pour acquit. Montant intégralement réglé : aucun paiement supplémentaire n'est dû.", 9, font, MUTED);
+
+  page.drawLine({ start: { x: M, y: 96 }, end: { x: right, y: 96 }, thickness: 0.5, color: LINE });
+  [
+    safe(ISSUER.legal),
+    safe(`${ISSUER.address}, ${ISSUER.postalCity} - SIRET ${ISSUER.siret} - TVA ${ISSUER.vat} - APE ${ISSUER.ape}`),
+    safe(`${ISSUER.phone} - ${ISSUER.email} - ${ISSUER.site}`),
+  ].forEach((line, i) => page.drawText(line.slice(0, 150), { x: M, y: 80 - i * 11, size: 7, font, color: MUTED }));
 
   return doc.save();
 }

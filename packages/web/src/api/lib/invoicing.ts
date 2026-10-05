@@ -24,6 +24,9 @@ export function myposUrl() {
   return process.env.MYPOS_PAYMENT_URL ?? "https://mypos.com/@lbgrevetement";
 }
 
+/** Facture proforma (PF-AAAA-NNNN) : document avant paiement, sans valeur comptable. */
+export const isProforma = (number: string) => number.startsWith("PF-");
+
 /** Numérotation séquentielle FA-AAAA-NNNN, sans trou dans l'année en cours. */
 export async function nextInvoiceNumber(now = new Date(), kind = "FA") {
   const year = now.getFullYear();
@@ -94,15 +97,25 @@ export interface CreateInvoiceArgs {
   locale?: "fr" | "en";
   vatRate?: number;
   dueInDays?: number;
-  /** « FA » pour une facture, « AV » pour un avoir (numérotation séparée). */
-  numberPrefix?: "FA" | "AV";
+  /** « FA » facture, « AV » avoir, « PF » facture proforma (numérotations séparées). */
+  numberPrefix?: "FA" | "AV" | "PF";
+  /** TTC figé au devis : absorbe l'écart d'arrondi (±1 centime) HT×1,2 ≠ TTC affiché. */
+  totalTtcCents?: number | null;
+  /** Statut initial forcé (ex. FA émise directement « payee » à la confirmation myPOS). */
+  status?: string;
 }
 
 /** Crée une facture pro numérotée + ses lignes, et renvoie le document complet. */
 export async function createInvoice(args: CreateInvoiceArgs) {
   const now = new Date();
   const vatRate = args.vatRate ?? VAT_RATE;
-  const { lines, subtotalCents, vatCents, totalCents } = totalsFor(args.items, vatRate);
+  const computed = totalsFor(args.items, vatRate);
+  const { lines, subtotalCents } = computed;
+  let { vatCents, totalCents } = computed;
+  if (args.totalTtcCents && Math.abs(args.totalTtcCents - totalCents) <= 1) {
+    totalCents = args.totalTtcCents;
+    vatCents = totalCents - subtotalCents;
+  }
   // Garde-fou central (toutes les voies : paiement, back-office) : une facture liée à un
   // devis reprend EXACTEMENT le montant HT du devis accepté. Seul l'avoir y déroge.
   if (args.quoteRef && args.numberPrefix !== "AV") {
@@ -117,9 +130,13 @@ export async function createInvoice(args: CreateInvoiceArgs) {
       });
     }
   }
-  const number = await nextInvoiceNumber(now, args.numberPrefix ?? "FA");
-
-  const [invoice] = await db
+  // Numérotation séquentielle : deux créations simultanées peuvent viser le même
+  // numéro → l'index unique refuse la seconde, qui retente avec le suivant.
+  let invoice: typeof schema.invoices.$inferSelect | undefined;
+  for (let attempt = 0; attempt < 5 && !invoice; attempt++) {
+    const number = await nextInvoiceNumber(now, args.numberPrefix ?? "FA");
+    try {
+      [invoice] = await db
     .insert(schema.invoices)
     .values({
       number,
@@ -135,7 +152,7 @@ export async function createInvoice(args: CreateInvoiceArgs) {
       vatRate,
       vatCents,
       totalCents,
-      status: args.numberPrefix === "AV" ? "avoir" : "en_attente_paiement",
+      status: args.status ?? (args.numberPrefix === "AV" ? "avoir" : "en_attente_paiement"),
       notes: args.notes ?? null,
       locale: args.locale ?? "fr",
       dueAt: new Date(now.getTime() + (args.dueInDays ?? 14) * 86400000),
@@ -143,6 +160,12 @@ export async function createInvoice(args: CreateInvoiceArgs) {
       updatedAt: now,
     })
     .returning();
+    } catch (err) {
+      const msg = `${String(err)} ${String((err as { cause?: unknown }).cause ?? "")}`;
+      if (attempt === 4 || !msg.includes("UNIQUE")) throw err;
+    }
+  }
+  if (!invoice) throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "Numérotation de facture impossible." });
 
   if (lines.length > 0) {
     await db.insert(schema.invoiceItems).values(lines.map((line) => ({ ...line, invoiceId: invoice.id })));

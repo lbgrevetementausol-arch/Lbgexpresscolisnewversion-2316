@@ -118,6 +118,9 @@ export const pro = {
     ref: z.string(),
     status: z.enum(["nouveau", "accepte", "paye", "en_cours", "livre", "annule"]),
   }).handler(async ({ input }) => {
+    if (input.status === "paye") {
+      throw new ORPCError("BAD_REQUEST", { message: "« Commande confirmée » est posé uniquement par la notification de paiement myPOS." });
+    }
     await db
       .update(schema.quotes)
       .set({ status: input.status })
