@@ -21,7 +21,7 @@ import { Reveal } from "../components/site/reveal";
 const SERVICES = [
   {
     icon: Package,
-    image: "/images/livraison.jpg",
+    image: "/images/camion-autoroute-paris-lyon.jpg",
     fr: "Covoiturage de colis en France",
     en: "Parcel ride-sharing in France",
     descFr:
@@ -69,7 +69,7 @@ const SERVICES = [
   },
   {
     icon: Sofa,
-    image: "/images/demenagement-2.jpg",
+    image: "/images/demenagement-lbg.jpg",
     fr: "Déménagement",
     en: "Moving",
     descFr:

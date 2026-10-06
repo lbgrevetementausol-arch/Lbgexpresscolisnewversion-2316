@@ -28,6 +28,7 @@ import { Reveal } from "../components/site/reveal";
 import { ComparisonTable, ProblemSolution } from "../components/site/solution";
 import { DeliveriesGallery } from "../components/site/deliveries-gallery";
 import { TrustBadges } from "../components/site/trust-badges";
+import { HeroVideo } from "../components/site/hero-video";
 import { useSeo } from "../lib/seo";
 import { SEO_ROUTES } from "../lib/seo-routes";
 
@@ -41,7 +42,7 @@ const STATS = [
 const SERVICES = [
   {
     icon: Package,
-    image: "/images/livraison.jpg",
+    image: "/images/camion-autoroute-paris-lyon.jpg",
     fr: "Livraison de colis",
     en: "Parcel delivery",
     descFr: "Enlèvement à domicile, dépôt relais ou point à point, partout en France, en 24 à 72 h.",
@@ -59,7 +60,7 @@ const SERVICES = [
   },
   {
     icon: Boxes,
-    image: "/images/palette.jpg",
+    image: "/images/camion-la-courneuve-93.jpg",
     fr: "Fret & palettes",
     en: "Freight & pallets",
     descFr: "Groupage et palettes complètes, hayon, prise de rendez-vous livraison, jusqu'à 3,5 t.",
@@ -68,7 +69,7 @@ const SERVICES = [
   },
   {
     icon: Sofa,
-    image: "/images/demenagement.jpg",
+    image: "/images/demenagement-lbg.jpg",
     fr: "Déménagement",
     en: "Moving services",
     descFr: "Studio ou maison : emballage, démontage, portage, remontage. Devis au m³ transparent.",
@@ -199,20 +200,22 @@ function Index() {
     <>
       {/* HERO */}
       <section className="relative overflow-hidden">
-        <img
-          src="/images/hero.jpg"
-          alt=""
-          className="absolute inset-0 size-full object-cover opacity-30"
-          fetchPriority="high"
-        />
-        <div className="absolute inset-0 bg-gradient-to-br from-background via-background/90 to-background/70" />
-        <div className="grid-bg absolute inset-0 opacity-60" />
+        {/* Vidéo plein cadre, voilée par un dégradé : lisible à gauche, la route reste visible à droite */}
+        <div className="absolute inset-x-0 top-0 h-[380px] sm:h-[460px] lg:inset-0 lg:h-auto">
+          <HeroVideo />
+          {/* Mobile : bandeau vidéo sous le header, le titre vient le chevaucher en bas */}
+          <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/20 via-45% to-background lg:hidden" />
+          {/* Desktop : voile de gauche à droite, le texte reste lisible et la route visible à droite */}
+          <div className="absolute inset-0 hidden bg-gradient-to-r from-background via-background/80 to-background/20 lg:block" />
+          <div className="absolute inset-x-0 top-0 hidden h-32 bg-gradient-to-b from-background/80 to-transparent lg:block" />
+          <div className="absolute inset-x-0 bottom-0 hidden h-2/5 bg-gradient-to-t from-background via-background/60 to-transparent lg:block" />
+        </div>
         <div
           className="absolute -right-32 top-[-10rem] size-[34rem] rounded-full blur-[130px]"
-          style={{ background: "radial-gradient(circle, rgba(57,213,255,0.25), transparent 70%)" }}
+          style={{ background: "radial-gradient(circle, rgba(57,213,255,0.18), transparent 70%)" }}
         />
 
-        <div className="container-lbg relative grid gap-12 py-20 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:py-28">
+        <div className="container-lbg relative grid gap-12 pb-20 pt-56 sm:pt-72 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:py-28">
           <div className="animate-rise">
             <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3.5 py-1.5 text-xs font-semibold text-primary">
               <span className="size-1.5 animate-pulse rounded-full bg-primary" />
@@ -577,7 +580,7 @@ function Index() {
 
       {/* CTA */}
       <section className="relative overflow-hidden border-t border-border">
-        <img src="/images/livraison-2.jpg" alt="" className="absolute inset-0 size-full object-cover opacity-20" />
+        <img src="/images/camion-la-courneuve-93.jpg" alt="" loading="lazy" className="absolute inset-0 size-full object-cover opacity-25" />
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-background/60" />
         <div className="container-lbg relative py-20 text-center">
           <h2 className="mx-auto max-w-2xl font-display text-3xl font-extrabold leading-tight md:text-[2.6rem]">

@@ -53,7 +53,7 @@ export default function DevisPage() {
           fr: "Remplissez le trajet et la marchandise : le prix se met à jour en direct. Vous validez, nous planifions l'enlèvement.",
           en: "Fill in the route and the goods: the price updates live. You confirm, we schedule the pickup.",
         })}
-        image="/images/livraison-2.jpg"
+        image="/images/camion-la-courneuve-93.jpg"
       />
 
       <Section>

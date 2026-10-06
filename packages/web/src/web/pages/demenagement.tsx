@@ -4,6 +4,7 @@ import { PageHero } from "../components/site/layout";
 import { Card, Section, SectionHead } from "../components/site/section";
 import { FormDemenagement } from "../components/site/form-demenagement";
 import { TrustBadges } from "../components/site/trust-badges";
+import { PhotoBand } from "../components/site/photo-band";
 import { Reveal } from "../components/site/reveal";
 import { useSeo } from "../lib/seo";
 import { SEO_ROUTES } from "../lib/seo-routes";
@@ -61,7 +62,7 @@ export default function DemenagementPage() {
           fr: "Estimez votre déménagement au volume, avec ou sans emballage, étages et ascenseur pris en compte. Devis instantané, visite technique offerte au-delà de 30 m³.",
           en: "Estimate your move by volume, with or without packing, floors and elevator taken into account. Instant quote, free survey above 30 m³.",
         })}
-        image="/images/demenagement.jpg"
+        image="/images/demenagement-lbg.jpg"
         compact
       />
 
@@ -69,6 +70,21 @@ export default function DemenagementPage() {
       <Section className="py-10 md:py-12" id="devis">
         <FormDemenagement />
         <TrustBadges className="mt-6" />
+        <PhotoBand
+          className="mt-10"
+          src="/images/demenagement-lbg.jpg"
+          alt={t({
+            fr: "Déménageurs LBG Express Colis chargeant des meubles dans le camion par le hayon",
+            en: "LBG Express Colis movers loading furniture into the truck via the tail-lift",
+          })}
+          title={t({ fr: "Vos meubles chargés avec soin, de la porte au camion", en: "Your furniture loaded with care, from door to truck" })}
+          position="40% center"
+          chips={[
+            { icon: Users, label: t({ fr: "2 à 4 déménageurs", en: "2 to 4 movers" }) },
+            { icon: Wrench, label: t({ fr: "Démontage / remontage", en: "Dismantling / reassembly" }) },
+            { icon: Boxes, label: t({ fr: "Emballage fourni", en: "Packing supplied" }) },
+          ]}
+        />
       </Section>
 
       <Section className="border-t border-border bg-surface/40">

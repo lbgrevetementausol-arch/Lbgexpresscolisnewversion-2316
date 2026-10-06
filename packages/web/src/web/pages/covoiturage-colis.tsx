@@ -4,6 +4,7 @@ import { PageHero } from "../components/site/layout";
 import { Card, Section, SectionHead } from "../components/site/section";
 import { FormCovoiturage } from "../components/site/form-covoiturage";
 import { TrustBadges } from "../components/site/trust-badges";
+import { PhotoBand } from "../components/site/photo-band";
 import { Reveal } from "../components/site/reveal";
 import { useSeo } from "../lib/seo";
 import { SEO_ROUTES } from "../lib/seo-routes";
@@ -76,7 +77,7 @@ export default function CovoiturageColisPage() {
           fr: "Votre colis monte dans un véhicule qui fait déjà la route. Le trajet est mutualisé, donc vous ne payez pas un camion entier — juste la place que votre colis occupe. Transporteurs professionnels, remise en main propre, prix ferme annoncé avant la commande.",
           en: "Your parcel rides in a vehicle already making the trip. The route is shared, so you don't pay for a whole truck — only the space your parcel takes. Professional carriers, in-person handover, firm price before you order.",
         })}
-        image="/images/livraison.jpg"
+        image="/images/camion-autoroute-paris-lyon.jpg"
         compact
       />
 
@@ -125,6 +126,21 @@ export default function CovoiturageColisPage() {
             </Reveal>
           ))}
         </div>
+        <PhotoBand
+          className="mt-12"
+          src="/images/camion-autoroute-paris-lyon.jpg"
+          alt={t({
+            fr: "Utilitaire LBG Express Colis sur l'autoroute Paris – Lyon",
+            en: "LBG Express Colis van on the Paris – Lyon motorway",
+          })}
+          title={t({ fr: "Paris → Lyon : votre colis prend la route avec nous", en: "Paris → Lyon: your parcel hits the road with us" })}
+          position="center 60%"
+          chips={[
+            { icon: Route, label: t({ fr: "Trajet mutualisé", en: "Shared route" }) },
+            { icon: HandCoins, label: t({ fr: "Remise en main propre", en: "In-person handover" }) },
+            { icon: ShieldCheck, label: t({ fr: "Assuré RC Pro", en: "Insured" }) },
+          ]}
+        />
       </Section>
 
 

@@ -33,12 +33,12 @@ const ZONE_DETAIL: Record<string, { fr: string; en: string; image: string }> = {
   idf: {
     fr: "Paris et les 7 départements de la couronne, avec enlèvement en 2 h et livraison le jour même possible.",
     en: "Paris and the 7 surrounding départements, with 2-hour pickup and same-day delivery available.",
-    image: "/images/van-night.jpg",
+    image: "/images/camion-la-courneuve-93.jpg",
   },
   france: {
     fr: "Les 96 départements métropolitains, livraison à domicile, en entreprise ou en point relais.",
     en: "All 96 mainland départements, delivered to homes, businesses or pickup points.",
-    image: "/images/livraison.jpg",
+    image: "/images/camion-autoroute-paris-lyon.jpg",
   },
   corse: {
     fr: "Corse, Guadeloupe, Martinique, Guyane, La Réunion et Mayotte par voie maritime ou aérienne.",
