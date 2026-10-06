@@ -308,7 +308,7 @@ function Index() {
         </div>
         <Reveal className="mt-10">
           <img
-            src="/images/site-ordinateur-mobile.jpg"
+            src="/images/site-ordinateur-mobile-v2.jpg"
             alt={t({
               fr: "Le site LBG Express Colis sur ordinateur et sur mobile : estimation immédiate du prix d'un envoi",
               en: "The LBG Express Colis website on desktop and mobile: instant shipping price estimate",
