@@ -4,16 +4,20 @@ import {
   ArrowRight,
   Boxes,
   Building2,
+  Calculator,
   Clock,
+  FileText,
   Globe2,
+  Home,
   MapPin,
   MessageCircle,
   Package,
+  PackageCheck,
   Plane,
-  ShieldCheck,
+  Radar,
   Sofa,
   Star,
-  Truck,
+  Timer,
   Zap,
 } from "lucide-react";
 import { useI18n } from "../lib/i18n";
@@ -23,6 +27,7 @@ import { Card, Section, SectionHead } from "../components/site/section";
 import { Reveal } from "../components/site/reveal";
 import { ComparisonTable, ProblemSolution } from "../components/site/solution";
 import { DeliveriesGallery } from "../components/site/deliveries-gallery";
+import { TrustBadges } from "../components/site/trust-badges";
 import { useSeo } from "../lib/seo";
 import { SEO_ROUTES } from "../lib/seo-routes";
 
@@ -92,29 +97,41 @@ const SERVICES = [
 
 const STEPS = [
   {
+    icon: Calculator,
     fr: "Estimez en 30 secondes",
     en: "Estimate in 30 seconds",
-    descFr: "Poids, dimensions, destination : le prix s'affiche immédiatement, sans inscription.",
-    descEn: "Weight, dimensions, destination: the price shows instantly, no sign-up needed.",
+    descFr: "Prix immédiat, sans inscription.",
+    descEn: "Instant price, no sign-up.",
   },
   {
-    fr: "Validez votre commande",
-    en: "Confirm your order",
-    descFr: "Adresses complétées automatiquement, options d'assurance et d'emballage, paiement en ligne.",
-    descEn: "Auto-completed addresses, insurance and packing options, online payment.",
+    icon: FileText,
+    fr: "Payez votre proforma",
+    en: "Pay your proforma",
+    descFr: "Paiement sécurisé myPOS, commande confirmée.",
+    descEn: "Secure myPOS payment, order confirmed.",
   },
   {
+    icon: PackageCheck,
     fr: "Nous enlevons le colis",
     en: "We pick it up",
-    descFr: "Un livreur passe à l'adresse convenue et scanne votre envoi au format TRK.",
-    descEn: "A driver collects at the agreed address and scans your shipment into the TRK system.",
+    descFr: "À l'adresse convenue, numéro TRK attribué.",
+    descEn: "At the agreed address, TRK number assigned.",
   },
   {
+    icon: Radar,
     fr: "Suivez en temps réel",
     en: "Track in real time",
-    descFr: "Chaque étape est horodatée, avec la position GPS du livreur et une notification de livraison.",
-    descEn: "Every step is timestamped, with the driver's GPS position and a delivery notification.",
+    descFr: "Étapes horodatées jusqu'à la livraison.",
+    descEn: "Timestamped steps until delivery.",
   },
+];
+
+/** Atouts du hero, en icônes plutôt qu'en paragraphe. */
+const HERO_POINTS = [
+  { icon: Timer, fr: "Prix en 30 s", en: "Price in 30 s" },
+  { icon: Home, fr: "Enlèvement à domicile", en: "Home pickup" },
+  { icon: FileText, fr: "Facture avec TVA", en: "VAT invoice" },
+  { icon: Radar, fr: "Suivi sans compte", en: "Tracking, no account" },
 ];
 
 const ZONES_HOME = [
@@ -160,8 +177,8 @@ const FAQ_SHORT = [
   {
     q: { fr: "Mes envois sont-ils assurés ?", en: "Are my shipments insured?" },
     a: {
-      fr: "Nous sommes assurés chez Simplis en responsabilité civile professionnelle : les biens confiés sont couverts jusqu'à 100 000 € par sinistre, avec une franchise de 200 €. Pour un envoi de valeur, déclarez-la : l'assurance ad valorem coûte 1,2 % de la valeur déclarée, minimum 8 € HT.",
-      en: "We are insured with Simplis under professional liability: goods entrusted are covered up to €100,000 per claim, with a €200 deductible. For a valuable shipment, declare its value: ad valorem insurance costs 1.2% of the declared value, minimum €8 excl. VAT.",
+      fr: "Nous sommes assurés en responsabilité civile professionnelle chez Simplis (assureur WAKAM), contrat n° 76486184 valable jusqu'au 23/06/2027 : les biens confiés sont couverts jusqu'à 100 000 € par sinistre, franchise 200 €. Pour un envoi de valeur, déclarez-la : l'assurance ad valorem coûte 0,7 % de la valeur déclarée, minimum 8 € HT.",
+      en: "We hold professional liability insurance with Simplis (underwriter WAKAM), policy no. 76486184 valid until 23 June 2027: goods entrusted are covered up to €100,000 per claim, €200 deductible. For a valuable shipment, declare its value: ad valorem insurance costs 0.7% of the declared value, minimum €8 excl. VAT.",
     },
   },
   {
@@ -208,10 +225,21 @@ function Index() {
             </h1>
             <p className="mt-6 max-w-xl text-[1.0625rem] leading-relaxed text-muted">
               {t({
-                fr: "Colis et déménagements en Île-de-France, envois vers le Bénin, le Togo et le Mali. Prix affiché en 30 secondes, enlèvement chez vous, facture avec TVA, suivi en ligne sans créer de compte.",
-                en: "Parcels and moving across Greater Paris, shipping to Benin, Togo and Mali. Price in 30 seconds, pickup at your door, invoice with VAT, online tracking without an account.",
+                fr: "Colis et déménagements en Île-de-France, envois vers le Bénin, le Togo et le Mali.",
+                en: "Parcels and moving across Greater Paris, shipping to Benin, Togo and Mali.",
               })}
             </p>
+            <ul className="mt-5 flex max-w-xl flex-wrap gap-2">
+              {HERO_POINTS.map((p) => (
+                <li
+                  key={p.fr}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/60 px-3 py-1.5 text-xs font-semibold"
+                >
+                  <p.icon className="size-3.5 text-primary" aria-hidden />
+                  {t(p)}
+                </li>
+              ))}
+            </ul>
             <p className="mt-4 max-w-xl text-sm leading-relaxed text-primary">
               {t({
                 fr: "10 kg vers l'Afrique de l'Ouest : 94,99 € chez nous en aérien, contre 148,99 € en Colissimo International (tarif officiel La Poste – Zone C). Petits colis en France dès 8,99 €.",
@@ -260,6 +288,38 @@ function Index() {
           </div>
         </div>
       </section>
+
+      {/* CONFIANCE : badges sous le calculateur, puis visuel plateforme */}
+      <section className="container-lbg pb-4">
+        <TrustBadges />
+      </section>
+
+      <Section className="pt-12 md:pt-14">
+        <div className="mx-auto max-w-3xl text-center">
+          <h2 className="font-display text-3xl font-extrabold leading-tight md:text-[2.4rem]">
+            {t({ fr: "Prêt à expédier vos colis de manière fiable ?", en: "Ready to ship your parcels reliably?" })}
+          </h2>
+          <p className="mt-5 text-[1.0625rem] leading-relaxed text-muted">
+            {t({
+              fr: "Que ce soit pour un covoiturage de colis intelligent en France, un déménagement sur-mesure ou un envoi de colis international vers le Bénin, le Togo et le Mali, trouver le bon transporteur peut s'avérer complexe. LBG Express Colis est votre partenaire de confiance pour simplifier toutes vos expéditions, par voie aérienne ou maritime, au juste prix et en toute sécurité.",
+              en: "Whether it's smart parcel ride-sharing in France, a tailored move or an international shipment to Benin, Togo and Mali, finding the right carrier can be complex. LBG Express Colis is your trusted partner to simplify all your shipments, by air or sea, at the right price and in complete safety.",
+            })}
+          </p>
+        </div>
+        <Reveal className="mt-10">
+          <img
+            src="/images/site-ordinateur-mobile.jpg"
+            alt={t({
+              fr: "Le site LBG Express Colis sur ordinateur et sur mobile : estimation immédiate du prix d'un envoi",
+              en: "The LBG Express Colis website on desktop and mobile: instant shipping price estimate",
+            })}
+            width={1920}
+            height={1080}
+            loading="lazy"
+            className="mx-auto w-full max-w-5xl rounded-card"
+          />
+        </Reveal>
+      </Section>
 
       {/* SERVICES */}
       <Section id="services">
@@ -337,11 +397,15 @@ function Index() {
           <ol className="space-y-4">
             {STEPS.map((step, i) => (
               <Reveal as="li" key={step.fr} delay={i * 80}>
-                <div className="glass flex gap-5 rounded-card p-5">
-                  <span className="font-display text-3xl font-extrabold text-primary/40">{`0${i + 1}`}</span>
+                <div className="glass flex items-center gap-5 rounded-card p-5">
+                  <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary">
+                    <step.icon className="size-5" aria-hidden />
+                  </span>
                   <div>
-                    <h3 className="font-display text-base font-bold">{t(step)}</h3>
-                    <p className="mt-1.5 text-sm leading-relaxed text-muted">
+                    <h3 className="font-display text-base font-bold">
+                      <span className="text-primary/60">{`0${i + 1}`}</span> {t(step)}
+                    </h3>
+                    <p className="mt-1 text-sm leading-relaxed text-muted">
                       {t({ fr: step.descFr, en: step.descEn })}
                     </p>
                   </div>
@@ -412,45 +476,6 @@ function Index() {
 
       {/* COMPARATIF */}
       <ComparisonTable className="border-t border-border bg-surface/40" />
-
-      {/* GARANTIES */}
-      <Section className="border-y border-border bg-surface/40">
-        <div className="grid gap-6 md:grid-cols-3">
-          {[
-            {
-              icon: ShieldCheck,
-              fr: "Assuré chez Simplis, jusqu'à 100 000 €",
-              en: "Insured with Simplis, up to €100,000",
-              descFr: "Responsabilité civile professionnelle, biens confiés couverts jusqu'à 100 000 € par sinistre, franchise de 200 €. Assureur et plafonds publiés sur le site.",
-              descEn: "Professional liability insurance, goods entrusted covered up to €100,000 per claim, €200 deductible. Insurer and limits published on the site.",
-            },
-            {
-              icon: Truck,
-              fr: "Flotte adaptée",
-              en: "Right vehicle, every time",
-              descFr: "Du scooter au 20 m³ avec hayon : le véhicule est choisi selon le volume réel.",
-              descEn: "From scooter to 20 m³ tail-lift van: the vehicle matches the actual volume.",
-            },
-            {
-              icon: Clock,
-              fr: "Support 7j/7",
-              en: "Support 7 days a week",
-              descFr: "WhatsApp, téléphone, email : un humain répond entre 8 h et 20 h, samedi et dimanche inclus.",
-              descEn: "WhatsApp, phone, email: a human answers from 8 am to 8 pm, weekends included.",
-            },
-          ].map((item, i) => (
-            <Reveal key={item.fr} delay={i * 70}>
-              <Card className="h-full">
-                <span className="grid size-11 place-items-center rounded-xl bg-primary/12 text-primary">
-                  <item.icon className="size-5" />
-                </span>
-                <h3 className="mt-5 font-display text-base font-bold">{t(item)}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted">{t({ fr: item.descFr, en: item.descEn })}</p>
-              </Card>
-            </Reveal>
-          ))}
-        </div>
-      </Section>
 
       <DeliveriesGallery />
 

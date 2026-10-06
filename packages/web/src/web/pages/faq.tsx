@@ -113,8 +113,8 @@ const GROUPS: { title: { fr: string; en: string }; items: Qa[] }[] = [
       {
         q: { fr: "Que couvre l'assurance ad valorem ?", en: "What does ad valorem insurance cover?" },
         a: {
-          fr: "La valeur déclarée du contenu en cas de perte, vol ou avaries, pour 1,2 % du montant déclaré. Sans elle, l'indemnisation reste plafonnée au barème légal du transport (au kilo).",
-          en: "The declared value of the contents in case of loss, theft or damage, for 1.2% of the declared amount. Without it, compensation stays capped at the statutory per-kilo transport scale.",
+          fr: "La valeur déclarée du contenu en cas de perte, vol ou avaries, pour 0,7 % du montant déclaré (minimum 8 € HT). Sans elle, l'indemnisation reste plafonnée au barème légal du transport (au kilo).",
+          en: "The declared value of the contents in case of loss, theft or damage, for 0.7% of the declared amount (minimum €8 excl. VAT). Without it, compensation stays capped at the statutory per-kilo transport scale.",
         },
       },
     ],

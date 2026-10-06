@@ -4,6 +4,7 @@ import { PageHero } from "../components/site/layout";
 import { Section } from "../components/site/section";
 import { QuoteForm } from "../components/site/quote-form";
 import { Reveal } from "../components/site/reveal";
+import { TrustBadges } from "../components/site/trust-badges";
 import { useSeo } from "../lib/seo";
 import { SEO_ROUTES } from "../lib/seo-routes";
 
@@ -12,29 +13,29 @@ const ARGS = [
     icon: BadgeEuro,
     fr: "Prix ferme immédiat",
     en: "Firm price, instantly",
-    descFr: "Le tarif affiché est celui que vous payez : pas de frais de dossier ni de surprise à la livraison.",
-    descEn: "The price shown is the price you pay — no admin fees, no surprises on delivery.",
+    descFr: "Zéro frais de dossier, zéro surprise.",
+    descEn: "No admin fees, no surprises.",
   },
   {
     icon: Clock,
     fr: "Enlèvement sous 24 h",
     en: "Pickup within 24 h",
-    descFr: "Créneau confirmé par SMS ou WhatsApp, du lundi au samedi, y compris en soirée en Île-de-France.",
-    descEn: "Slot confirmed by SMS or WhatsApp, Monday to Saturday, evenings included in Greater Paris.",
+    descFr: "Créneau confirmé par SMS ou WhatsApp, du lundi au samedi.",
+    descEn: "Slot confirmed by SMS or WhatsApp, Monday to Saturday.",
   },
   {
     icon: ShieldCheck,
     fr: "Assurance ad valorem",
     en: "Ad valorem insurance",
-    descFr: "Couverture de la valeur déclarée pour 1,2 % du montant, activable en une case à cocher.",
-    descEn: "Declared-value cover for 1.2% of the amount, activated with a single checkbox.",
+    descFr: "Valeur déclarée couverte pour 0,7 %, en une case.",
+    descEn: "Declared value covered for 0.7%, one checkbox.",
   },
   {
     icon: Truck,
     fr: "Suivi TRK dès la validation",
     en: "TRK tracking on confirmation",
-    descFr: "Numéro de suivi, timeline et position GPS du livreur accessibles à vous et à votre destinataire.",
-    descEn: "Tracking number, timeline and driver GPS position available to you and your recipient.",
+    descFr: "Timeline et position du livreur, pour vous et le destinataire.",
+    descEn: "Timeline and driver position, for you and the recipient.",
   },
 ];
 
@@ -57,6 +58,7 @@ export default function DevisPage() {
 
       <Section>
         <QuoteForm variant="colis" />
+        <TrustBadges className="mt-6" />
       </Section>
 
       <Section className="border-t border-border bg-surface/40 py-16 md:py-20">

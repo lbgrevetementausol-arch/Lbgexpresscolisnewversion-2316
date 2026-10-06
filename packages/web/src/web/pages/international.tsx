@@ -15,29 +15,29 @@ const MODES = [
     icon: Plane,
     fr: "Aérien express",
     en: "Air express",
-    descFr: "5 à 10 jours porte-à-porte vers Cotonou, Lomé et Bamako. C'est un délai cible, pas une garantie : si la date bouge, nous vous prévenons.",
-    descEn: "5 to 10 days door-to-door to Cotonou, Lomé and Bamako. This is a target lead time, not a guarantee: if the date moves, we tell you.",
+    descFr: "5 à 10 jours porte-à-porte (délai cible, vous êtes prévenu si la date bouge).",
+    descEn: "5 to 10 days door-to-door (target lead time, you are told if it moves).",
   },
   {
     icon: Ship,
     fr: "Maritime groupage",
     en: "Sea groupage",
-    descFr: "L'option économique pour les cartons, barriques et meubles : comptez 30 à 45 jours de porte à porte, avec dédouanement à l'arrivée.",
-    descEn: "The economical option for boxes, drums and furniture: expect 30 to 45 days door-to-door, with clearance on arrival.",
+    descFr: "Cartons, barriques, meubles : 30 à 45 jours, dédouanement inclus.",
+    descEn: "Boxes, drums, furniture: 30 to 45 days, clearance included.",
   },
   {
     icon: FileCheck2,
     fr: "Formalités douanières",
     en: "Customs formalities",
-    descFr: "Nous préparons la facture commerciale, la liste de colisage et le dédouanement à l'arrivée.",
-    descEn: "We prepare the commercial invoice, packing list and clearance on arrival.",
+    descFr: "Facture commerciale, colisage et dédouanement préparés.",
+    descEn: "Commercial invoice, packing list and clearance prepared.",
   },
   {
     icon: Globe2,
     fr: "Livraison finale",
     en: "Final delivery",
-    descFr: "Remise à domicile ou retrait en agence partenaire, avec notification WhatsApp au destinataire.",
-    descEn: "Home delivery or pickup at a partner agency, with WhatsApp notification to the recipient.",
+    descFr: "À domicile ou en agence partenaire, destinataire prévenu sur WhatsApp.",
+    descEn: "At home or at a partner agency, recipient notified on WhatsApp.",
   },
 ];
 
@@ -125,8 +125,8 @@ export default function InternationalPage() {
           </ul>
           <p className="mt-4 text-sm text-muted">
             {t({
-              fr: "Nous préférons annoncer trois destinations que nous maîtrisons plutôt qu'une liste de quarante pays. Pour une autre destination, écrivez-nous : nous étudions le dossier au cas par cas et nous refusons si nous ne pouvons pas tenir.",
-              en: "We would rather announce three destinations we truly master than a list of forty countries. For anywhere else, write to us: we study each case individually, and we say no when we cannot deliver.",
+              fr: "Une autre destination ? Écrivez-nous : étude au cas par cas.",
+              en: "Another destination? Write to us: case-by-case review.",
             })}
           </p>
         </Reveal>
