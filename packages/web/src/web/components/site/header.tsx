@@ -1,3 +1,4 @@
+import { BrandLogo } from "./brand-logo";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
@@ -105,12 +106,8 @@ export function Header() {
       )}
     >
       <div className="container-lbg flex h-[72px] items-center gap-4">
-        <Link to="/" className="flex shrink-0 items-center gap-2.5">
-          <img src="/images/logo.png" alt="LBG Express Colis" className="size-10 rounded-lg" />
-          <span className="hidden font-display text-[0.95rem] font-bold leading-tight sm:block">
-            LBG<span className="text-primary">EXPRESS</span>
-            <span className="block text-[0.62rem] font-medium uppercase tracking-[0.22em] text-muted">Colis</span>
-          </span>
+        <Link to="/" aria-label="LBG Express Colis — accueil" className="flex shrink-0 items-center">
+          <BrandLogo className="h-9 sm:h-10" />
         </Link>
 
         <nav className="ml-auto hidden items-center gap-1 lg:flex">

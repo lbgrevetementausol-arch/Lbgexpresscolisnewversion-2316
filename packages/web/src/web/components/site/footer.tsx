@@ -1,3 +1,4 @@
+import { BrandLogo } from "./brand-logo";
 import { Link } from "wouter";
 import { Instagram, Mail, MessageCircle, Phone } from "lucide-react";
 import { useI18n } from "../../lib/i18n";
@@ -69,12 +70,7 @@ export function Footer() {
     <footer className="border-t border-border bg-surface/60">
       <div className="container-lbg grid gap-12 py-16 md:grid-cols-2 lg:grid-cols-[1.35fr_1fr_1fr_1fr_1fr]">
         <div>
-          <div className="flex items-center gap-3">
-            <img src="/images/logo.png" alt="LBG Express Colis" className="size-11 rounded-lg" />
-            <span className="font-display text-lg font-bold">
-              LBG<span className="text-primary">EXPRESS</span> COLIS
-            </span>
-          </div>
+          <BrandLogo className="h-12" />
           <p className="mt-5 max-w-sm text-sm leading-relaxed text-muted">
             {t({
               fr: "Transport de colis, fret et déménagement en France et à l'international. Enlèvement à domicile, suivi temps réel, tarifs transparents.",

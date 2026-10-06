@@ -140,7 +140,7 @@ export function organizationJsonLd() {
         name: COMPANY.brand,
         legalName: COMPANY.legalName,
         url: SITE_URL,
-        logo: { "@type": "ImageObject", url: absolute("/images/logo.png") },
+        logo: { "@type": "ImageObject", url: absolute("/images/logo-lbg-express-fond.png") },
         image: absolute("/images/hero.jpg"),
         description:
           "Transport de colis, fret et déménagement en Île-de-France, partout en France et à l'international (Bénin, Togo, Mali). Enlèvement à domicile, suivi en temps réel, tarification transparente.",
@@ -246,7 +246,7 @@ export function articleJsonLd(input: {
         "@type": "Organization",
         name: "LBG Express Colis",
         url: SITE_URL,
-        logo: { "@type": "ImageObject", url: absolute("/images/logo.png") },
+        logo: { "@type": "ImageObject", url: absolute("/images/logo-lbg-express-fond.png") },
       },
     },
   ];

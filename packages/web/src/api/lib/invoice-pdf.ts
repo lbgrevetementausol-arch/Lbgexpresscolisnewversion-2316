@@ -78,7 +78,7 @@ function fit(text: string, font: PDFFont, size: number, maxWidth: number): strin
 /** Logo optionnel : une facture doit partir même si le fichier est introuvable. */
 async function embedLogo(doc: PDFDocument) {
   try {
-    const path = `${import.meta.dir}/../../../public/images/logo.png`;
+    const path = `${import.meta.dir}/../../../public/images/logo-lbg-express.png`;
     const bytes = await Bun.file(path).arrayBuffer();
     return await doc.embedPng(bytes);
   } catch {
@@ -109,7 +109,7 @@ export async function buildInvoicePdf(
   page.drawRectangle({ x: 0, y: A4.height - 118, width: A4.width, height: 118, color: INK });
 
   if (logo) {
-    const scaled = logo.scaleToFit(120, 46);
+    const scaled = logo.scaleToFit(190, 46);
     page.drawImage(logo, {
       x: M,
       y: A4.height - 60 - scaled.height / 2,
@@ -316,7 +316,7 @@ export async function buildReceiptPdf(input: ReceiptPdfInput): Promise<Uint8Arra
   const right = A4.width - M;
   page.drawRectangle({ x: 0, y: A4.height - 118, width: A4.width, height: 118, color: INK });
   if (logo) {
-    const scaled = logo.scaleToFit(120, 46);
+    const scaled = logo.scaleToFit(190, 46);
     page.drawImage(logo, { x: M, y: A4.height - 60 - scaled.height / 2, width: scaled.width, height: scaled.height });
   } else {
     page.drawText("LBG EXPRESS COLIS", { x: M, y: A4.height - 68, size: 17, font: bold, color: WHITE });
