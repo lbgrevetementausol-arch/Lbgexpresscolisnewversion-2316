@@ -27,27 +27,31 @@ const BADGES = [
   {
     icon: ShieldCheck,
     highlight: true,
+    logo: { src: "/images/simplis.png", alt: "Simplis", width: 284, height: 120 },
     label: { fr: "Assuré RC Pro", en: "Insured (prof. liability)" },
     detail: {
-      fr: `${INSURANCE.insurer} × ${INSURANCE.underwriter} · biens confiés jusqu'à ${INSURANCE.entrustedCap.fr}`,
-      en: `${INSURANCE.insurer} × ${INSURANCE.underwriter} · goods entrusted up to ${INSURANCE.entrustedCap.en}`,
+      fr: `Biens confiés jusqu'à ${INSURANCE.entrustedCap.fr}`,
+      en: `Goods entrusted up to ${INSURANCE.entrustedCap.en}`,
     },
   },
   {
     icon: LockKeyhole,
     highlight: false,
+    logo: { src: "/images/mypos.png", alt: "myPOS", width: 120, height: 120 },
     label: { fr: "Paiement sécurisé", en: "Secure payment" },
-    detail: { fr: "myPOS · 3-D Secure", en: "myPOS · 3-D Secure" },
+    detail: { fr: "Carte bancaire · 3-D Secure", en: "Bank card · 3-D Secure" },
   },
   {
     icon: BadgeEuro,
     highlight: false,
+    logo: null,
     label: { fr: "Prix TTC ferme", en: "Firm price incl. VAT" },
     detail: { fr: "Facture proforma avant paiement", en: "Proforma invoice before payment" },
   },
   {
     icon: PhoneCall,
     highlight: false,
+    logo: null,
     label: { fr: "Transporteur joignable", en: "Reachable carrier" },
     detail: { fr: "Appel rapide après paiement", en: "Quick call after payment" },
   },
@@ -70,14 +74,20 @@ export function TrustBadges({ className }: { className?: string }) {
               b.highlight ? "border-primary/45 bg-primary/10" : "border-border bg-background/40",
             )}
           >
-            <span
-              className={cn(
-                "grid size-11 shrink-0 place-items-center rounded-xl",
-                b.highlight ? "bg-primary text-primary-foreground" : "bg-primary/12 text-primary",
-              )}
-            >
-              <b.icon className="size-5" aria-hidden />
-            </span>
+            {b.logo ? (
+              <img
+                src={b.logo.src}
+                alt={b.logo.alt}
+                width={b.logo.width}
+                height={b.logo.height}
+                loading="lazy"
+                className="h-11 w-auto shrink-0 rounded-xl ring-1 ring-black/5"
+              />
+            ) : (
+              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary">
+                <b.icon className="size-5" aria-hidden />
+              </span>
+            )}
             <span className="min-w-0">
               <span className="block text-sm font-bold leading-tight">{t(b.label)}</span>
               <span className="mt-0.5 block text-xs leading-snug text-muted">{t(b.detail)}</span>
@@ -87,8 +97,8 @@ export function TrustBadges({ className }: { className?: string }) {
       </ul>
       <p className="mt-3 text-center text-[0.7rem] leading-relaxed text-muted">
         {t({
-          fr: `Contrat ${INSURANCE.insurer} n° ${INSURANCE.contract}, valable jusqu'au ${INSURANCE.validUntil.fr} · franchise ${INSURANCE.deductible.fr} · attestation sur demande · SIRET ${COMPANY.siret}`,
-          en: `${INSURANCE.insurer} policy no. ${INSURANCE.contract}, valid until ${INSURANCE.validUntil.en} · ${INSURANCE.deductible.en} deductible · certificate on request · SIRET ${COMPANY.siret}`,
+          fr: `Contrat ${INSURANCE.insurer} (assureur ${INSURANCE.underwriter}) n° ${INSURANCE.contract}, valable jusqu'au ${INSURANCE.validUntil.fr} · franchise ${INSURANCE.deductible.fr} · attestation sur demande · SIRET ${COMPANY.siret}`,
+          en: `${INSURANCE.insurer} (underwriter ${INSURANCE.underwriter}) policy no. ${INSURANCE.contract}, valid until ${INSURANCE.validUntil.en} · ${INSURANCE.deductible.en} deductible · certificate on request · SIRET ${COMPANY.siret}`,
         })}
       </p>
     </section>
