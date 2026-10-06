@@ -63,7 +63,7 @@ const ZONE_DETAIL: Record<string, { fr: string; en: string; image: string }> = {
   monde: {
     fr: "Amériques, Asie, Moyen-Orient et Océanie : sur devis uniquement, via nos partenaires.",
     en: "Americas, Asia, Middle East and Oceania: on quotation only, through our partners.",
-    image: "/images/hero.jpg",
+    image: "/images/camion-lbg-route.jpg",
   },
 };
 
@@ -98,7 +98,7 @@ export default function ZonesPage() {
                 <Reveal key={zone.id} delay={i * 55}>
                   <Card className="flex h-full flex-col overflow-hidden p-0">
                     <div className="relative h-36 overflow-hidden">
-                      <img src={detail?.image ?? "/images/hero.jpg"} alt="" className="size-full object-cover" loading="lazy" />
+                      <img src={detail?.image ?? "/images/camion-lbg-route.jpg"} alt="" className="size-full object-cover" loading="lazy" />
                       <div className="absolute inset-0 bg-gradient-to-t from-surface to-transparent" />
                     </div>
                     <div className="flex flex-1 flex-col p-6">
